@@ -1,0 +1,66 @@
+name: Update-sing-box
+
+on:
+  schedule:
+    - cron: 0/5 * * * *
+
+jobs:
+
+  prepare:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        fetch-depth: 0
+        lfs: true
+
+    - name: Set git identity
+      run : |
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+    - name: Load latest sing-box
+      run: |
+        git clone -b main https://github.com/SagerNet/sing-box.git --depth=1 ./tmp/sing-box
+        cp -rf ./tmp/sing-box/adapter ./
+        cp -rf ./tmp/sing-box/clients ./
+        cp -rf ./tmp/sing-box/cmd ./
+        cp -rf ./tmp/sing-box/common ./
+        cp -rf ./tmp/sing-box/constant ./
+        cp -rf ./tmp/sing-box/dns ./
+        cp -rf ./tmp/sing-box/docs ./
+        cp -rf ./tmp/sing-box/experimental ./
+        cp -rf ./tmp/sing-box/include ./
+        cp -rf ./tmp/sing-box/log ./
+        cp -rf ./tmp/sing-box/option ./
+        cp -rf ./tmp/sing-box/protocol ./
+        cp -rf ./tmp/sing-box/release ./
+        cp -rf ./tmp/sing-box/route ./
+        cp -rf ./tmp/sing-box/test ./
+        cp -rf ./tmp/sing-box/transport ./
+        cp -rf ./tmp/sing-box/.fpm ./
+        cp -rf ./tmp/sing-box/Dockerfile ./
+        cp -rf ./tmp/sing-box/LICENSE ./
+        cp -rf ./tmp/sing-box/Makefile ./
+        cp -rf ./tmp/sing-box/README.md ./
+        cp -rf ./tmp/sing-box/box.go ./
+        cp -rf ./tmp/sing-box/debug.go ./
+        cp -rf ./tmp/sing-box/debug_http.go ./
+        cp -rf ./tmp/sing-box/debug_stub.go ./
+        cp -rf ./tmp/sing-box/debug_unix.go ./
+        cp -rf ./tmp/sing-box/go.mod ./
+        cp -rf ./tmp/sing-box/go.sum ./
+        cp -rf ./tmp/sing-box/mkdocs.yml ./
+    - name: Apply commit changes
+      run: |
+        git add ./adapter/ ./clients/ ./cmd/ ./common/ ./constant/ ./dns/ ./docs/ ./experimental/ ./include/ ./log/ ./option/ ./protocol/ ./release/ ./route/ ./test/ ./transport/ ./.fpm ./Dockerfile ./LICENSE ./Makefile ./README.md ./box.go ./debug.go ./debug_http.go ./debug_stub.go ./debug_unix.go ./go.mod ./go.sum ./mkdocs.yml
+        echo -e "[bot] sing-box: update\n\nlatest commit: $(cat ./tmp/sing-box/.git/refs/heads/main)" > ./tmp/message
+        git commit --file="./tmp/message" || exit 0
+    - name: Push Commits
+      env:
+        DOWNSTREAM_BRANCH: main
+      run: git push origin $DOWNSTREAM_BRANCH

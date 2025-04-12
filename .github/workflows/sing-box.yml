@@ -25,7 +25,7 @@ jobs:
         git config --global user.name "github-actions[bot]"
     - name: Load latest sing-box
       run: |
-        git clone -b main https://github.com/SagerNet/sing-box.git --depth=1 ./tmp/sing-box
+        git clone -b dev-next https://github.com/SagerNet/sing-box.git --depth=1 ./tmp/sing-box
         cp -rf ./tmp/sing-box/adapter ./
         cp -rf ./tmp/sing-box/clients ./
         cp -rf ./tmp/sing-box/cmd ./

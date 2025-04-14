@@ -42,7 +42,7 @@ jobs:
         cp -rf ./tmp/sing-box/route ./
         cp -rf ./tmp/sing-box/test ./
         cp -rf ./tmp/sing-box/transport ./
-        cp -rf ./tmp/sing-box/.fpm ./
+        cp -rf ./tmp/sing-box/.fpm_openwrt ./
         cp -rf ./tmp/sing-box/Dockerfile ./
         cp -rf ./tmp/sing-box/LICENSE ./
         cp -rf ./tmp/sing-box/Makefile ./
@@ -57,7 +57,7 @@ jobs:
         cp -rf ./tmp/sing-box/mkdocs.yml ./
     - name: Apply commit changes
       run: |
-        git add ./adapter/ ./clients/ ./cmd/ ./common/ ./constant/ ./dns/ ./docs/ ./experimental/ ./include/ ./log/ ./option/ ./protocol/ ./release/ ./route/ ./test/ ./transport/ ./.fpm ./Dockerfile ./LICENSE ./Makefile ./README.md ./box.go ./debug.go ./debug_http.go ./debug_stub.go ./debug_unix.go ./go.mod ./go.sum ./mkdocs.yml
+        git add ./adapter/ ./clients/ ./cmd/ ./common/ ./constant/ ./dns/ ./docs/ ./experimental/ ./include/ ./log/ ./option/ ./protocol/ ./release/ ./route/ ./test/ ./transport/ ./.fpm_openwrt ./Dockerfile ./LICENSE ./Makefile ./README.md ./box.go ./debug.go ./debug_http.go ./debug_stub.go ./debug_unix.go ./go.mod ./go.sum ./mkdocs.yml
         echo -e "[bot] sing-box: update\n\nlatest commit: $(cat ./tmp/sing-box/.git/refs/heads/main)" > ./tmp/message
         git commit --file="./tmp/message" || exit 0
     - name: Push Commits

@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -49,6 +50,7 @@ type Server struct {
 	httpServer     *http.Server
 	trafficManager *trafficontrol.Manager
 	urlTestHistory adapter.URLTestHistoryStorage
+	uiUpdateAccess sync.Mutex
 	logDebug       bool
 
 	mode           string

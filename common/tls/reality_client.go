@@ -218,10 +218,6 @@ func realityClientFallback(ctx context.Context, uConn net.Conn, serverName strin
 	response.Body.Close()
 }
 
-func (e *RealityClientConfig) SetSessionIDGenerator(generator func(clientHello []byte, sessionID []byte) error) {
-	e.uClient.config.SessionIDGenerator = generator
-}
-
 func (e *RealityClientConfig) Clone() Config {
 	return &RealityClientConfig{
 		e.ctx,

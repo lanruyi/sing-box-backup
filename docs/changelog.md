@@ -9,7 +9,7 @@ icon: material/alert-decagram
 
 **1**:
 
-You can now set `bind_interface` `routing_mark` and `reuse_addr` in Listen Fields.
+You can now set `bind_interface`, `routing_mark` and `reuse_addr` in Listen Fields.
 
 See [Listen Fields](/configuration/shared/listen/).
 

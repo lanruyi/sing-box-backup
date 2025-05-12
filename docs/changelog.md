@@ -4,7 +4,12 @@ icon: material/alert-decagram
 
 #### 1.12.0-beta.13
 
+* Add TLS record fragment route options **1**
 * Fixes and improvements
+
+**1**:
+
+See [Route Action](/configuration/route/rule_action/#tls_record_fragment).
 
 #### 1.12.0-beta.10
 

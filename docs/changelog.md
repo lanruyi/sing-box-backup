@@ -28,6 +28,13 @@ SSM API service is a RESTful API server for managing Shadowsocks servers.
 
 See [SSM API Service](/configuration/service/ssm-api/).
 
+### 1.11.11
+
+* Fixes and improvements
+
+_We are temporarily unable to update sing-box apps on the App Store because the reviewer mistakenly found that we
+violated the rules (TestFlight users are not affected)._
+
 #### 1.12.0-beta.13
 
 * Add TLS record fragment route options **1**

@@ -31,7 +31,4 @@ func registerDERPService(registry *service.Registry) {
 	service.Register[option.DERPServiceOptions](registry, C.TypeDERP, func(ctx context.Context, logger log.ContextLogger, tag string, options option.DERPServiceOptions) (adapter.Service, error) {
 		return nil, E.New(`DERP is not included in this build, rebuild with -tags with_tailscale`)
 	})
-	service.Register[option.DERPSTUNServiceOptions](registry, C.TypeDERP, func(ctx context.Context, logger log.ContextLogger, tag string, options option.DERPSTUNServiceOptions) (adapter.Service, error) {
-		return nil, E.New(`STUN (DERP) is not included in this build, rebuild with -tags with_tailscale`)
-	})
 }

@@ -29,7 +29,7 @@ icon: material/new-box
 
 ==Required==
 
-The tag of the [Resolved service](/configuration/service/resolved).
+The tag of the [Resolved Service](/configuration/service/resolved).
 
 #### accept_default_resolvers
 

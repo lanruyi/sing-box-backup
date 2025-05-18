@@ -6,9 +6,10 @@ icon: material/new-box
 
 # Resolved
 
-Resolved service is a fake systemd-resolved DBUS service to receive DNS settings from other programs and provide DNS resolution.
+Resolved service is a fake systemd-resolved DBUS service to receive DNS settings from other programs
+(e.g. NetworkManager) and provide DNS resolution.
 
-See also: [Resolved DNS server](/configuration/dns/server/resolved/)
+See also: [Resolved DNS Server](/configuration/dns/server/resolved/)
 
 ### Structure
 

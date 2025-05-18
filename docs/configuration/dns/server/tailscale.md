@@ -30,7 +30,7 @@ icon: material/new-box
 
 ==Required==
 
-The tag of the [Tailscale endpoint](/configuration/endpoint/tailscale).
+The tag of the [Tailscale Endpoint](/configuration/endpoint/tailscale).
 
 #### accept_default_resolvers
 

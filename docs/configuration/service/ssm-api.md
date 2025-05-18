@@ -6,7 +6,7 @@ icon: material/new-box
 
 # SSM API
 
-SSM API is a RESTful API server for managing Shadowsocks servers.
+SSM API service is a RESTful API server for managing Shadowsocks servers.
 
 See https://github.com/Shadowsocks-NET/shadowsocks-specs/blob/main/2023-1-shadowsocks-server-management-api-v1.md
 

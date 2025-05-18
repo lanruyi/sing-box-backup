@@ -88,8 +88,8 @@ Object format:
 
 Object fields:
 
-- `server`: *Required* DERP server address.
-- `server_port`: *Required* DERP server port.
+- `server`: **Required** DERP server address.
+- `server_port`: **Required** DERP server port.
 - `host`: Custom DERP hostname.
 - `tls`: [TLS](/configuration/shared/tls/#outbound)
 - `Dial Fields`: [Dial Fields](/configuration/shared/dial/)
@@ -118,9 +118,9 @@ Object format:
 
 Object fields:
 
-- `enabled`: *Required* Enable STUN server.
-- `listen`: *Required* STUN server listen address, default to `::`.
-- `listen_port`: *Required* STUN server listen port, default to `3478`.
+- `enabled`: **Required** Enable STUN server.
+- `listen`: **Required** STUN server listen address, default to `::`.
+- `listen_port`: **Required** STUN server listen port, default to `3478`.
 - `other Listen Fields`: [Listen Fields](/configuration/shared/listen/)
 
 Setting `stun` value to a number `__PORT__` is equivalent to configuring:

@@ -105,7 +105,7 @@ func publishTestflight(ctx context.Context) error {
 		return err
 	}
 	tag := tagVersion.VersionString()
-	client := createClient(30 * time.Minute)
+	client := createClient(20 * time.Minute)
 
 	log.Info(tag, " list build IDs")
 	buildIDsResponse, _, err := client.TestFlight.ListBuildIDsForBetaGroup(ctx, groupID, nil)

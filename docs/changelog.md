@@ -4,7 +4,14 @@ icon: material/alert-decagram
 
 #### 1.12.0-beta.20
 
+* Fix missing `home` option for DERP service **1**
 * Fixes and improvements
+
+**1**:
+
+You can now choose what the DERP home page shows, just like with derper's `-home` flag.
+
+See [DERP](/configuration/service/derp/#home).
 
 ### 1.11.12
 

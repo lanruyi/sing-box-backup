@@ -4,7 +4,7 @@ icon: material/new-box
 
 !!! quote "sing-box 1.12.0 中的更改"
 
-    :material-plus: [local_redirect_address](#local_redirect_address)
+    :material-plus: [loopback_address](#loopback_address)
 
 !!! quote "sing-box 1.11.0 中的更改"
 
@@ -63,7 +63,7 @@ icon: material/new-box
   "auto_redirect": true,
   "auto_redirect_input_mark": "0x2023",
   "auto_redirect_output_mark": "0x2024",
-  "local_redirect_address": [
+  "loopback_address": [
     "10.0.7.1"
   ],
   "strict_route": true,
@@ -277,11 +277,11 @@ tun 接口的 IPv6 前缀。
 
 默认使用 `0x2024`。
 
-#### local_redirect_address
+#### loopback_address
 
 !!! question "自 sing-box 1.12.0 起"
 
-本地重定向地址是用于使指向指定地址的 TCP 连接连接到原始地址的环回地址。
+环回地址是用于使指向指定地址的 TCP 连接连接到来源地址的。
 
 将选项值设置为 `10.0.7.1` 可实现与 SideStore/StosVPN 相同的行为。
 

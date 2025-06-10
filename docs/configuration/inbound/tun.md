@@ -4,7 +4,7 @@ icon: material/new-box
 
 !!! quote "Changes in sing-box 1.12.0"
 
-    :material-plus: [local_redirect_address](#local_redirect_address)
+    :material-plus: [loopback_address](#loopback_address)
 
 !!! quote "Changes in sing-box 1.11.0"
 
@@ -63,7 +63,7 @@ icon: material/new-box
   "auto_redirect": true,
   "auto_redirect_input_mark": "0x2023",
   "auto_redirect_output_mark": "0x2024",
-  "local_redirect_address": [
+  "loopback_address": [
     "10.0.7.1"
   ],
   "strict_route": true,
@@ -278,11 +278,11 @@ Connection output mark used by `auto_redirect`.
 
 `0x2024` is used by default.
 
-#### local_redirect_address
+#### loopback_address
 
 !!! question "Since sing-box 1.12.0"
 
-Local redirect addresses are loopback addresses to make TCP connections to the specified address connect to the original address.
+Loopback addresses make TCP connections to the specified address connect to the source address.
 
 Setting option value to `10.0.7.1` achieves the same behavior as SideStore/StosVPN.
 

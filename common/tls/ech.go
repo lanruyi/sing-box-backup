@@ -102,12 +102,6 @@ func reloadECHKeys(echKeyPath string, tlsConfig *tls.Config) error {
 	return nil
 }
 
-type ECHCapableConfig interface {
-	Config
-	ECHConfigList() []byte
-	SetECHConfigList([]byte)
-}
-
 type ECHClientConfig struct {
 	ECHCapableConfig
 	access     sync.Mutex

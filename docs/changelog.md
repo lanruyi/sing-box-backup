@@ -6,6 +6,8 @@ icon: material/alert-decagram
 
 * Allow `tls_fragment` and `tls_record_fragment` to be enabled together **1**
 * Also add fragment options for TLS client configuration **2**
+* Allow ECH and uTLS to be enabled together in TLS client configuration
+* Fixes and improvements
 
 **1**:
 

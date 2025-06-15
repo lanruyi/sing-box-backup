@@ -76,7 +76,7 @@ example.arpa
 			Domain: domain,
 		}), domain)
 	}
-	ruleFromOptions, err := FromOptions(rules[0])
+	ruleFromOptions, err := FromOptions(rules)
 	require.NoError(t, err)
 	require.Equal(t, ruleString, string(ruleFromOptions))
 }

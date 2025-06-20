@@ -40,12 +40,7 @@ parseLine:
 		if ruleLine == "" {
 			continue
 		}
-		if strings.Contains(ruleLine, "!") {
-			continue
-		}
-		if strings.Contains(ruleLine, "#") {
-			ignoredLines++
-			logger.Debug("ignored unsupported cosmetic filter: ", ruleLine)
+		if strings.HasPrefix(ruleLine, "!") || strings.HasPrefix(ruleLine, "#") {
 			continue
 		}
 		originRuleLine := ruleLine
@@ -147,12 +142,9 @@ parseLine:
 				logger.Debug("ignored unsupported rule with query: ", ruleLine)
 				continue
 			}
-			if strings.Contains(ruleLine, "[") || strings.Contains(ruleLine, "]") {
-				ignoredLines++
-				logger.Debug("ignored unsupported cosmetic filter: ", ruleLine)
-				continue
-			}
-			if strings.Contains(ruleLine, "(") || strings.Contains(ruleLine, ")") {
+			if strings.Contains(ruleLine, "[") || strings.Contains(ruleLine, "]") ||
+				strings.Contains(ruleLine, "(") || strings.Contains(ruleLine, ")") ||
+				strings.Contains(ruleLine, "!") || strings.Contains(ruleLine, "#") {
 				ignoredLines++
 				logger.Debug("ignored unsupported cosmetic filter: ", ruleLine)
 				continue
@@ -302,7 +294,9 @@ parseLine:
 			},
 		}
 	}
-	logger.Info("parsed rules: ", len(ruleLines), "/", len(ruleLines)+ignoredLines)
+	if ignoredLines > 0 {
+		logger.Info("parsed rules: ", len(ruleLines), "/", len(ruleLines)+ignoredLines)
+	}
 	return []option.HeadlessRule{currentRule}, nil
 }
 

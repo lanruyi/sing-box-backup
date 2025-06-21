@@ -10,6 +10,7 @@ import (
 	"github.com/sagernet/sing-box/dns"
 	dnsOutbound "github.com/sagernet/sing-box/protocol/dns"
 	R "github.com/sagernet/sing-box/route/rule"
+	R "github.com/sagernet/sing-box/route/rule"
 	"github.com/sagernet/sing/common/buf"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"

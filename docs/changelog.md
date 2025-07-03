@@ -4,7 +4,12 @@ icon: material/alert-decagram
 
 #### 1.12.0-beta.31
 
+* Improve tun performance on Apple platforms **1**
 * Fixes and improvements
+
+**1**:
+
+We have significantly improved the performance of tun inbound on Apple platforms, especially in the gVisor stack.
 
 ### 1.11.14
 

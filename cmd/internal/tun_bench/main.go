@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/netip"
 	"os"
@@ -45,7 +46,8 @@ func main0() error {
 
 func runTests() ([]TestResult, error) {
 	boxPaths := []string{
-		"/Users/sekai/Downloads/sing-box-1.11.15-darwin-arm64/sing-box",
+		//"/Users/sekai/Downloads/sing-box-1.11.15-darwin-arm64/sing-box",
+		//"/Users/sekai/Downloads/sing-box-1.11.15-linux-arm64/sing-box",
 		"./sing-box",
 	}
 	stacks := []string{
@@ -53,8 +55,11 @@ func runTests() ([]TestResult, error) {
 		"system",
 	}
 	mtus := []int{
-		4064,
-		9000,
+		// 1500,
+		// 4064,
+		// 16384,
+		32768,
+		49152,
 		65535,
 	}
 	flagList := [][]string{
@@ -66,14 +71,14 @@ func runTests() ([]TestResult, error) {
 			for _, mtu := range mtus {
 				if strings.HasPrefix(boxPath, ".") {
 					for _, flags := range flagList {
-						result, err := testOnce(boxPath, stack, mtu, flags)
+						result, err := testOnce(boxPath, stack, mtu, false, flags)
 						if err != nil {
 							return nil, err
 						}
 						results = append(results, *result)
 					}
 				} else {
-					result, err := testOnce(boxPath, stack, mtu, nil)
+					result, err := testOnce(boxPath, stack, mtu, false, nil)
 					if err != nil {
 						return nil, err
 					}
@@ -90,11 +95,12 @@ type TestResult struct {
 	Stack         string   `json:"stack"`
 	MTU           int      `json:"mtu"`
 	Flags         []string `json:"flags"`
-	DownloadSpeed string   `json:"download_speed"`
+	MultiThread   bool     `json:"multi_thread"`
 	UploadSpeed   string   `json:"upload_speed"`
+	DownloadSpeed string   `json:"download_speed"`
 }
 
-func testOnce(boxPath string, stackName string, mtu int, flags []string) (result *TestResult, err error) {
+func testOnce(boxPath string, stackName string, mtu int, multiThread bool, flags []string) (result *TestResult, err error) {
 	testAddress := netip.MustParseAddr("1.1.1.1")
 	testConfig := option.Options{
 		Inbounds: []option.Inbound{
@@ -176,9 +182,16 @@ func testOnce(boxPath string, stackName string, mtu int, flags []string) (result
 
 	time.Sleep(time.Second)
 
-	uploadProcess := shell.Exec(iperf3Path, "-c", testAddress.String())
+	args := []string{"-c", testAddress.String(), "-t", "5"}
+	if multiThread {
+		args = append(args, "-P", "10")
+	}
+
+	uploadProcess := shell.Exec(iperf3Path, args...)
 	output, err := uploadProcess.Read()
 	if err != nil {
+		boxProcess.Process.Signal(syscall.SIGKILL)
+		serverProcess.Process.Signal(syscall.SIGKILL)
 		println(output)
 		return
 	}
@@ -194,12 +207,15 @@ func testOnce(boxPath string, stackName string, mtu int, flags []string) (result
 		Stack:       stackName,
 		MTU:         mtu,
 		Flags:       flags,
+		MultiThread: multiThread,
 		UploadSpeed: uploadResult,
 	}
 
-	downloadProcess := shell.Exec(iperf3Path, "-c", testAddress.String(), "-R")
+	downloadProcess := shell.Exec(iperf3Path, append(args, "-R")...)
 	output, err = downloadProcess.Read()
 	if err != nil {
+		boxProcess.Process.Signal(syscall.SIGKILL)
+		serverProcess.Process.Signal(syscall.SIGKILL)
 		println(output)
 		return
 	}
@@ -212,11 +228,14 @@ func testOnce(boxPath string, stackName string, mtu int, flags []string) (result
 
 	result.DownloadSpeed = downloadResult
 
+	printArgs := []any{boxPath, stackName, mtu, "upload", uploadResult, "download", downloadResult}
 	if len(flags) > 0 {
-		println(boxPath, stackName, mtu, "upload", uploadResult, "download", downloadResult, "flags", strings.Join(flags, " "))
-	} else {
-		println(boxPath, stackName, mtu, "upload", uploadResult, "download", downloadResult)
+		printArgs = append(printArgs, "flags", strings.Join(flags, " "))
 	}
+	if multiThread {
+		printArgs = append(printArgs, "(-P 10)")
+	}
+	fmt.Println(printArgs...)
 	err = boxProcess.Process.Signal(syscall.SIGTERM)
 	if err != nil {
 		return

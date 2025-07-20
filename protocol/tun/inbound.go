@@ -135,8 +135,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 	enableGSO := C.IsLinux && options.Stack == "gvisor" && platformInterface == nil && tunMTU > 0 && tunMTU < 49152
 	if tunMTU == 0 {
 		if platformInterface != nil && platformInterface.UnderNetworkExtension() {
-			// In Network Extension, when MTU exceeds 4064 (4096-UTUN_IF_HEADROOM_SIZE), the performance of tun will drop significantly, which may be a system bug.
-			tunMTU = 4064
+			tunMTU = 4000
 		} else {
 			tunMTU = 65535
 		}

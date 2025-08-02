@@ -2,9 +2,130 @@
 icon: material/alert-decagram
 ---
 
-#### 1.12.0-rc.4
+#### 1.12.0
 
-* Fixes and improvements
+* Refactor DNS servers **1**
+* Add domain resolver options**2**
+* Add TLS fragment/record fragment support to route options and outbound TLS options **3**
+* Add certificate options **4**
+* Add Tailscale endpoint and DNS server **5**
+* Drop support for go1.22 **6**
+* Add AnyTLS protocol **7**
+* Migrate to stdlib ECH implementation **8**
+* Add NTP sniffer **9**
+* Add wildcard SNI support for ShadowTLS inbound **10**
+* Improve `auto_redirect` **11**
+* Add control options for listeners **12**
+* Add DERP service **13**
+* Add Resolved service and DNS server **14**
+* Add SSM API service **15**
+* Add loopback address support for tun **16**
+* Improve tun performance on Apple platforms **17**
+
+**1**:
+
+DNS servers are refactored for better performance and scalability.
+
+See [DNS server](/configuration/dns/server/).
+
+For migration, see [Migrate to new DNS server formats](/migration/#migrate-to-new-dns-servers).
+
+Compatibility for old formats will be removed in sing-box 1.14.0.
+
+**2**:
+
+Legacy `outbound` DNS rules are deprecated
+and can be replaced by the new `domain_resolver` option.
+
+See [Dial Fields](/configuration/shared/dial/#domain_resolver) and
+[Route](/configuration/route/#default_domain_resolver).
+
+For migration,
+see [Migrate outbound DNS rule items to domain resolver](/migration/#migrate-outbound-dns-rule-items-to-domain-resolver).
+
+**3**:
+
+See [Route Action](/configuration/route/rule_action/#tls_fragment) and [TLS](/configuration/shared/tls/).
+
+**4**:
+
+New certificate options allow you to manage the default list of trusted X509 CA certificates.
+
+For the system certificate list, fixed Go not reading Android trusted certificates correctly.
+
+You can also use the Mozilla Included List instead, or add trusted certificates yourself.
+
+See [Certificate](/configuration/certificate/).
+
+**5**:
+
+See [Tailscale](/configuration/endpoint/tailscale/).
+
+**6**:
+
+Due to maintenance difficulties, sing-box 1.12.0 requires at least Go 1.23 to compile.
+
+For Windows 7 users, legacy binaries now continue to compile with Go 1.23 and patches from [MetaCubeX/go](https://github.com/MetaCubeX/go).
+
+**7**:
+
+The new AnyTLS protocol claims to mitigate TLS proxy traffic characteristics and comes with a new multiplexing scheme.
+
+See [AnyTLS Inbound](/configuration/inbound/anytls/) and [AnyTLS Outbound](/configuration/outbound/anytls/).
+
+**8**:
+
+See [TLS](/configuration/shared/tls).
+
+The build tag `with_ech` is no longer needed and has been removed.
+
+**9**:
+
+See [Protocol Sniff](/configuration/route/sniff/).
+
+**10**:
+
+See [ShadowTLS](/configuration/inbound/shadowtls/#wildcard_sni).
+
+**11**:
+
+Now `auto_redirect` fixes compatibility issues between tun and Docker bridge networks,
+see [Tun](/configuration/inbound/tun/#auto_redirect).
+
+**12**:
+
+You can now set `bind_interface`, `routing_mark` and `reuse_addr` in Listen Fields.
+
+See [Listen Fields](/configuration/shared/listen/).
+
+**13**:
+
+DERP service is a Tailscale DERP server, similar to [derper](https://pkg.go.dev/tailscale.com/cmd/derper).
+
+See [DERP Service](/configuration/service/derp/).
+
+**14**:
+
+Resolved service is a fake systemd-resolved DBUS service to receive DNS settings from other programs
+(e.g. NetworkManager) and provide DNS resolution.
+
+See [Resolved Service](/configuration/service/resolved/) and [Resolved DNS Server](/configuration/dns/server/resolved/).
+
+**15**:
+
+SSM API service is a RESTful API server for managing Shadowsocks servers.
+
+See [SSM API Service](/configuration/service/ssm-api/).
+
+**16**:
+
+TUN now implements SideStore's StosVPN.
+
+See [Tun](/configuration/inbound/tun/#loopback_address).
+
+**17**:
+
+We have significantly improved the performance of tun inbound on Apple platforms, especially in the gVisor stack.
 
 ### 1.11.15
 

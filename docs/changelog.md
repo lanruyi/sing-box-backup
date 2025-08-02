@@ -21,6 +21,8 @@ icon: material/alert-decagram
 * Add SSM API service **15**
 * Add loopback address support for tun **16**
 * Improve tun performance on Apple platforms **17**
+* Update quic-go to v0.52.0
+* Update gVisor to 20250319.0
 
 **1**:
 
@@ -126,6 +128,23 @@ See [Tun](/configuration/inbound/tun/#loopback_address).
 **17**:
 
 We have significantly improved the performance of tun inbound on Apple platforms, especially in the gVisor stack.
+
+The following data was tested using [tun_bench](https://github.com/SagerNet/sing-box/blob/dev-next/cmd/internal/tun_bench/main.go) on M4 MacBook pro.
+
+| Version     | Stack  | MTU   | Upload | Download |
+|-------------|--------|-------|--------|----------|
+| 1.11.15     | gvisor | 1500  | 852M   | 2.57G    |
+| 1.12.0-rc.4 | gvisor | 1500  | 2.90G  | 4.68G    |
+| 1.11.15     | gvisor | 4064  | 2.31G  | 6.34G    |
+| 1.12.0-rc.4 | gvisor | 4064  | 7.54G  | 12.2G    |
+| 1.11.15     | gvisor | 65535 | 27.6G  | 18.1G    |
+| 1.12.0-rc.4 | gvisor | 65535 | 39.8G  | 34.7G    |
+| 1.11.15     | system | 1500  | 664M   | 706M     |
+| 1.12.0-rc.4 | system | 1500  | 2.44G  | 2.51G    |
+| 1.11.15     | system | 4064  | 1.88G  | 1.94G    |
+| 1.12.0-rc.4 | system | 4064  | 6.45G  | 6.27G    |
+| 1.11.15     | system | 65535 | 26.2G  | 17.4G    |
+| 1.12.0-rc.4 | system | 65535 | 17.6G  | 21.0G    |
 
 ### 1.11.15
 

@@ -153,8 +153,6 @@ We continue to experience issues updating our sing-box apps on the App Store and
 Until we rewrite and resubmit the apps, they are considered irrecoverable. 
 Therefore, after this release, we will not be repeating this notice unless there is new information.
 
-They are deemed hopeless to recover until we rewrite and resubmit it.
-
 ### 1.11.15
 
 * Fixes and improvements

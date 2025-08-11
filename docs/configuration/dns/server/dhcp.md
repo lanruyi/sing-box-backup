@@ -31,7 +31,7 @@ icon: material/new-box
 
 Interface name to listen on. 
 
-The default interface will be used by default.
+Tge default interface will be used by default.
 
 ### Dial Fields
 

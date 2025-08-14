@@ -35,6 +35,7 @@ type Outbound struct {
 	serverAddr      M.Socksaddr
 	multiplexDialer *mux.Client
 	tlsConfig       tls.Config
+	tlsDialer       tls.Dialer
 	transport       adapter.V2RayClientTransport
 	packetAddr      bool
 	xudp            bool
@@ -56,6 +57,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		if err != nil {
 			return nil, err
 		}
+		outbound.tlsDialer = tls.NewDialer(outboundDialer, outbound.tlsConfig)
 	}
 	if options.Transport != nil {
 		outbound.transport, err = v2ray.NewClientTransport(ctx, outbound.dialer, outbound.serverAddr, common.PtrValueOrDefault(options.Transport), outbound.tlsConfig)
@@ -124,7 +126,6 @@ func (h *Outbound) InterfaceUpdated() {
 	if h.multiplexDialer != nil {
 		h.multiplexDialer.Reset()
 	}
-	return
 }
 
 func (h *Outbound) Close() error {
@@ -142,10 +143,7 @@ func (h *vlessDialer) DialContext(ctx context.Context, network string, destinati
 	if h.transport != nil {
 		conn, err = h.transport.DialContext(ctx)
 	} else {
-		conn, err = h.dialer.DialContext(ctx, N.NetworkTCP, h.serverAddr)
-		if err == nil && h.tlsConfig != nil {
-			conn, err = tls.ClientHandshake(ctx, conn, h.tlsConfig)
-		}
+		conn, err = h.tlsDialer.DialTLSContext(ctx, h.serverAddr)
 	}
 	if err != nil {
 		return nil, err
@@ -185,10 +183,7 @@ func (h *vlessDialer) ListenPacket(ctx context.Context, destination M.Socksaddr)
 	if h.transport != nil {
 		conn, err = h.transport.DialContext(ctx)
 	} else {
-		conn, err = h.dialer.DialContext(ctx, N.NetworkTCP, h.serverAddr)
-		if err == nil && h.tlsConfig != nil {
-			conn, err = tls.ClientHandshake(ctx, conn, h.tlsConfig)
-		}
+		conn, err = h.tlsDialer.DialTLSContext(ctx, h.serverAddr)
 	}
 	if err != nil {
 		common.Close(conn)

@@ -43,7 +43,6 @@ const (
 	ruleItemNetworkType
 	ruleItemNetworkIsExpensive
 	ruleItemNetworkIsConstrained
-	ruleItemInterfaceAddress
 	ruleItemNetworkInterfaceAddress
 	ruleItemDefaultInterfaceAddress
 	ruleItemFinal uint8 = 0xFF
@@ -235,35 +234,6 @@ func readDefaultRule(reader varbin.Reader, recover bool) (rule option.DefaultHea
 			rule.NetworkIsExpensive = true
 		case ruleItemNetworkIsConstrained:
 			rule.NetworkIsConstrained = true
-		case ruleItemInterfaceAddress:
-			rule.InterfaceAddress = new(badjson.TypedMap[string, badoption.Listable[badoption.Prefixable]])
-			var size uint64
-			size, err = binary.ReadUvarint(reader)
-			if err != nil {
-				return
-			}
-			for i := uint64(0); i < size; i++ {
-				var key string
-				err = varbin.Read(reader, binary.BigEndian, &key)
-				if err != nil {
-					return
-				}
-				var value []badoption.Prefixable
-				var prefixCount uint64
-				prefixCount, err = binary.ReadUvarint(reader)
-				if err != nil {
-					return
-				}
-				for j := uint64(0); j < prefixCount; j++ {
-					var prefix netip.Prefix
-					prefix, err = readPrefix(reader)
-					if err != nil {
-						return
-					}
-					value = append(value, badoption.Prefixable(prefix))
-				}
-				rule.InterfaceAddress.Put(key, value)
-			}
 		case ruleItemNetworkInterfaceAddress:
 			rule.NetworkInterfaceAddress = new(badjson.TypedMap[option.InterfaceType, badoption.Listable[badoption.Prefixable]])
 			var size uint64
@@ -448,31 +418,6 @@ func writeDefaultRule(writer varbin.Writer, rule option.DefaultHeadlessRule, gen
 		err = binary.Write(writer, binary.BigEndian, ruleItemNetworkIsConstrained)
 		if err != nil {
 			return err
-		}
-	}
-	if rule.InterfaceAddress != nil && rule.InterfaceAddress.Size() > 0 {
-		if generateVersion < C.RuleSetVersion4 {
-			return E.New("`interface_address` rule item is only supported in version 4 or later")
-		}
-		err = writer.WriteByte(ruleItemInterfaceAddress)
-		if err != nil {
-			return err
-		}
-		_, err = varbin.WriteUvarint(writer, uint64(rule.InterfaceAddress.Size()))
-		if err != nil {
-			return err
-		}
-		for _, entry := range rule.InterfaceAddress.Entries() {
-			err = varbin.Write(writer, binary.BigEndian, entry.Key)
-			if err != nil {
-				return err
-			}
-			for _, rawPrefix := range entry.Value {
-				err = writePrefix(writer, rawPrefix.Build(netip.Prefix{}))
-				if err != nil {
-					return err
-				}
-			}
 		}
 	}
 	if rule.NetworkInterfaceAddress != nil && rule.NetworkInterfaceAddress.Size() > 0 {

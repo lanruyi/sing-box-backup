@@ -170,11 +170,6 @@ func NewDefaultHeadlessRule(ctx context.Context, options option.DefaultHeadlessR
 			rule.items = append(rule.items, item)
 			rule.allItems = append(rule.allItems, item)
 		}
-		if options.InterfaceAddress != nil && options.InterfaceAddress.Size() > 0 {
-			item := NewInterfaceAddressItem(networkManager, options.InterfaceAddress)
-			rule.items = append(rule.items, item)
-			rule.allItems = append(rule.allItems, item)
-		}
 		if options.NetworkInterfaceAddress != nil && options.NetworkInterfaceAddress.Size() > 0 {
 			item := NewNetworkInterfaceAddressItem(networkManager, options.NetworkInterfaceAddress)
 			rule.items = append(rule.items, item)

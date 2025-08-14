@@ -238,11 +238,19 @@ Available values: `wifi`, `cellular`, `ethernet` and `other`.
 
 !!! question "自 sing-box 1.13.0 起"
 
+!!! quote ""
+
+    仅在 Android 与 Apple 平台图形客户端中支持。
+
 匹配网络接口（可用值同 `network_type`）地址。
 
 #### default_interface_address
 
 !!! question "自 sing-box 1.13.0 起"
+
+!!! quote ""
+
+    仅支持 Linux、Windows 和 macOS.
 
 匹配默认接口地址。
 

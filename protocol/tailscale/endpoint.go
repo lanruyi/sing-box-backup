@@ -263,7 +263,7 @@ func (t *Endpoint) Start(stage adapter.StartStage) error {
 	if err != nil {
 		return E.Cause(err, "update prefs")
 	}
-	t.filter = (*atomic.Pointer[filter.Filter])(localBackend.ExportFilter())
+	t.filter = atomic.PointerForm(localBackend.ExportFilter())
 	go t.watchState()
 	return nil
 }

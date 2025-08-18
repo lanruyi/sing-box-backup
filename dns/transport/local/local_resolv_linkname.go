@@ -121,9 +121,9 @@ func cgoResSearch(hostname string, rtype, class int) (*mDNS.Msg, error) {
 	if resStateSize > 0 {
 		mem := _C_malloc(resStateSize)
 		defer _C_free(mem)
-		memSlice := unsafe.Slice(mem, resStateSize)
+		memSlice := unsafe.Slice((*byte)(mem), resStateSize)
 		clear(memSlice)
-		state = (*_C_struct___res_state)(&memSlice[0])
+		state = (*_C_struct___res_state)(unsafe.Pointer(&memSlice[0]))
 	}
 	if err := ResNinit(state); err != nil {
 		return nil, errors.New("res_ninit failure: " + err.Error())

@@ -18,9 +18,9 @@ func dnsReadConfig(_ context.Context, _ string) *dnsConfig {
 	if resStateSize > 0 {
 		mem := _C_malloc(resStateSize)
 		defer _C_free(mem)
-		memSlice := unsafe.Slice((*byte)(mem), resStateSize)
+		memSlice := unsafe.Slice(mem, resStateSize)
 		clear(memSlice)
-		state = (*_C_struct___res_state)(unsafe.Pointer(&memSlice[0]))
+		state = (*_C_struct___res_state)(&memSlice[0])
 	}
 	if err := ResNinit(state); err != nil {
 		return &dnsConfig{
@@ -62,10 +62,10 @@ func parseRawSockaddr(rawSockaddr *syscall.RawSockaddr) netip.Addr {
 	switch rawSockaddr.Family {
 	case syscall.AF_INET:
 		sa := (*syscall.RawSockaddrInet4)(unsafe.Pointer(rawSockaddr))
-		return netip.AddrFrom4([4]byte(sa.Addr))
+		return netip.AddrFrom4(sa.Addr)
 	case syscall.AF_INET6:
 		sa := (*syscall.RawSockaddrInet6)(unsafe.Pointer(rawSockaddr))
-		return netip.AddrFrom16([16]byte(sa.Addr))
+		return netip.AddrFrom16(sa.Addr)
 	default:
 		return netip.Addr{}
 	}

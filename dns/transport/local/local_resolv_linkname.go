@@ -14,6 +14,8 @@ import (
 	"unsafe"
 	_ "unsafe"
 
+	E "github.com/sagernet/sing/common/exceptions"
+
 	mDNS "github.com/miekg/dns"
 )
 
@@ -119,23 +121,15 @@ func cgoResSearch(hostname string, rtype, class int) (*mDNS.Msg, error) {
 	if resStateSize > 0 {
 		mem := _C_malloc(resStateSize)
 		defer _C_free(mem)
-		memSlice := unsafe.Slice((*byte)(mem), resStateSize)
+		memSlice := unsafe.Slice(mem, resStateSize)
 		clear(memSlice)
-		state = (*_C_struct___res_state)(unsafe.Pointer(&memSlice[0]))
+		state = (*_C_struct___res_state)(&memSlice[0])
 	}
 	if err := ResNinit(state); err != nil {
 		return nil, errors.New("res_ninit failure: " + err.Error())
 	}
 	defer ResNclose(state)
 
-	// Some res_nsearch implementations (like macOS) do not set errno.
-	// They set h_errno, which is not per-thread and useless to us.
-	// res_nsearch returns the size of the DNS response packet.
-	// But if the DNS response packet contains failure-like response codes,
-	// res_search returns -1 even though it has copied the packet into buf,
-	// giving us no way to find out how big the packet is.
-	// For now, we are willing to take res_search's word that there's nothing
-	// useful in the response, even though there *is* a response.
 	bufSize := maxDNSPacketSize
 	buf := (*_C_uchar)(_C_malloc(uintptr(bufSize)))
 	defer _C_free(unsafe.Pointer(buf))
@@ -147,12 +141,8 @@ func cgoResSearch(hostname string, rtype, class int) (*mDNS.Msg, error) {
 
 	var size int
 	for {
-		// size := _C_res_nsearch(state, (*_C_char)(unsafe.Pointer(s)), class, rtype, buf, bufSize)
 		size, _ = ResNsearch(state, s, class, rtype, buf, bufSize)
-		if size <= 0 || size > 0xffff {
-			return nil, errors.New("res_nsearch failure")
-		}
-		if size <= bufSize {
+		if size <= bufSize || size > 0xffff {
 			break
 		}
 
@@ -163,9 +153,18 @@ func cgoResSearch(hostname string, rtype, class int) (*mDNS.Msg, error) {
 	}
 
 	var msg mDNS.Msg
-	err = msg.Unpack(unsafe.Slice(buf, size))
-	if err != nil {
-		return nil, err
+	if size == -1 {
+		// macOS's libresolv seems to directly return -1 for responses that are not success responses but are exchanged.
+		// However, we still need the response, so we fall back to parsing the entire buffer.
+		err = msg.Unpack(unsafe.Slice(buf, bufSize))
+		if err != nil {
+			return nil, E.New("res_nsearch failure")
+		}
+	} else {
+		err = msg.Unpack(unsafe.Slice(buf, size))
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &msg, nil
 }

@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -20,6 +21,10 @@ import (
 	mDNS "github.com/miekg/dns"
 )
 
+func RegisterTransport(registry *dns.TransportRegistry) {
+	dns.RegisterTransport[option.LocalDNSServerOptions](registry, C.DNSTypeLocal, NewTransport)
+}
+
 var _ adapter.DNSTransport = (*Transport)(nil)
 
 type Transport struct {
@@ -28,10 +33,14 @@ type Transport struct {
 	logger   logger.ContextLogger
 	hosts    *hosts.File
 	dialer   N.Dialer
+	preferGo bool
 	resolved ResolvedResolver
 }
 
 func NewTransport(ctx context.Context, logger log.ContextLogger, tag string, options option.LocalDNSServerOptions) (adapter.DNSTransport, error) {
+	if C.IsDarwin && !options.PreferGo {
+		return NewResolvTransport(ctx, logger, tag)
+	}
 	transportDialer, err := dns.NewLocalDialer(ctx, options)
 	if err != nil {
 		return nil, err
@@ -42,19 +51,22 @@ func NewTransport(ctx context.Context, logger log.ContextLogger, tag string, opt
 		logger:           logger,
 		hosts:            hosts.NewFile(hosts.DefaultPath),
 		dialer:           transportDialer,
+		preferGo:         options.PreferGo,
 	}, nil
 }
 
 func (t *Transport) Start(stage adapter.StartStage) error {
 	switch stage {
 	case adapter.StartStateInitialize:
-		resolvedResolver, err := NewResolvedResolver(t.ctx, t.logger)
-		if err == nil {
-			err = resolvedResolver.Start()
+		if !t.preferGo {
+			resolvedResolver, err := NewResolvedResolver(t.ctx, t.logger)
 			if err == nil {
-				t.resolved = resolvedResolver
-			} else {
-				t.logger.Warn(E.Cause(err, "initialize resolved resolver"))
+				err = resolvedResolver.Start()
+				if err == nil {
+					t.resolved = resolvedResolver
+				} else {
+					t.logger.Warn(E.Cause(err, "initialize resolved resolver"))
+				}
 			}
 		}
 	}
@@ -84,6 +96,7 @@ func (t *Transport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg,
 		}
 	}
 	systemConfig := getSystemDNSConfig(t.ctx)
+	t.logger.TraceContext(ctx, "using servers ", strings.Join(systemConfig.servers, ", "))
 	if systemConfig.singleRequest || !(message.Question[0].Qtype == mDNS.TypeA || message.Question[0].Qtype == mDNS.TypeAAAA) {
 		return t.exchangeSingleRequest(ctx, systemConfig, message, domain)
 	} else {

@@ -59,7 +59,7 @@ func init() {
 	if err != nil {
 		currentTag = "unknown"
 	}
-	sharedFlags = append(sharedFlags, "-ldflags", "-X github.com/sagernet/sing-box/constant.Version="+currentTag+" -s -w -buildid=")
+	sharedFlags = append(sharedFlags, "-ldflags", "-X github.com/sagernet/sing-box/constant.Version="+currentTag+" -s -w -buildid= -checklinkname=0")
 	debugFlags = append(debugFlags, "-ldflags", "-X github.com/sagernet/sing-box/constant.Version="+currentTag)
 
 	sharedTags = append(sharedTags, "with_gvisor", "with_quic", "with_wireguard", "with_utls", "with_clash_api", "with_conntrack")
@@ -104,14 +104,6 @@ func buildAndroid() {
 		"-androidapi", "21",
 		"-javapkg=io.nekohasekai",
 		"-libname=box",
-	}
-
-	if !debugEnabled {
-		sharedFlags[3] = sharedFlags[3] + " -checklinkname=0"
-		args = append(args, sharedFlags...)
-	} else {
-		debugFlags[1] = debugFlags[1] + " -checklinkname=0"
-		args = append(args, debugFlags...)
 	}
 
 	tags := append(sharedTags, memcTags...)

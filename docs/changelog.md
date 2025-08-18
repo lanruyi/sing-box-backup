@@ -14,10 +14,6 @@ On Apple platforms, Windows, and Linux (when using systemd-resolved),
 
 See [Local DNS Server](/configuration/dns/server/local/).
 
-#### 1.12.2
-
-* Fixes and improvements
-
 #### 1.13.0-alpha.2
 
 * Add `preferred_by` rule item **1**

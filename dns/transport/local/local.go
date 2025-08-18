@@ -3,7 +3,6 @@ package local
 import (
 	"context"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -96,7 +95,6 @@ func (t *Transport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg,
 		}
 	}
 	systemConfig := getSystemDNSConfig(t.ctx)
-	t.logger.TraceContext(ctx, "using servers ", strings.Join(systemConfig.servers, ", "))
 	if systemConfig.singleRequest || !(message.Question[0].Qtype == mDNS.TypeA || message.Question[0].Qtype == mDNS.TypeAAAA) {
 		return t.exchangeSingleRequest(ctx, systemConfig, message, domain)
 	} else {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 
+	mDNS "github.com/miekg/dns"
 	"github.com/sagernet/sing-box/adapter"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/dns"
@@ -19,8 +20,6 @@ import (
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
-
-	mDNS "github.com/miekg/dns"
 )
 
 func RegisterTransport(registry *dns.TransportRegistry) {
@@ -67,14 +66,14 @@ func (t *Transport) Start(stage adapter.StartStage) error {
 	if stage != adapter.StartStateStart {
 		return nil
 	}
-	if !C.IsIos {
-		inboundManager := service.FromContext[adapter.InboundManager](t.ctx)
-		for _, inbound := range inboundManager.Inbounds() {
-			if inbound.Type() == C.TypeTun {
-				t.fallback = true
-				break
-			}
+	inboundManager := service.FromContext[adapter.InboundManager](t.ctx)
+	for _, inbound := range inboundManager.Inbounds() {
+		if inbound.Type() == C.TypeTun {
+			t.fallback = true
+			break
 		}
+	}
+	if !C.IsIos {
 		if t.fallback {
 			t.dhcpTransport = newDHCPTransport(t.TransportAdapter, log.ContextWithOverrideLevel(t.ctx, log.LevelDebug), t.dialer, t.logger)
 			if t.dhcpTransport != nil {

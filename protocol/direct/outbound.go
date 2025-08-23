@@ -153,8 +153,12 @@ func (h *Outbound) ListenPacket(ctx context.Context, destination M.Socksaddr) (n
 
 func (h *Outbound) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
 	ctx := log.ContextWithNewID(h.ctx)
-	h.logger.InfoContext(ctx, "linked ", metadata.Network, " connection to ", metadata.Destination.AddrString())
-	return ping.ConnectDestination(ctx, h.logger, common.MustCast[*dialer.DefaultDialer](h.dialer).DialerForICMPNetwork(metadata.Network).Control, metadata.Destination.Addr, routeContext)
+	destination, err := ping.ConnectDestination(ctx, h.logger, common.MustCast[*dialer.DefaultDialer](h.dialer).DialerForICMPNetwork(metadata.Network).Control, metadata.Destination.Addr, routeContext)
+	if err != nil {
+		return nil, err
+	}
+	h.logger.InfoContext(ctx, "linked ", metadata.Network, " connection from ", metadata.Source.AddrString(), " to ", metadata.Destination.AddrString())
+	return destination, nil
 }
 
 func (h *Outbound) DialParallel(ctx context.Context, network string, destination M.Socksaddr, destinationAddresses []netip.Addr) (net.Conn, error) {

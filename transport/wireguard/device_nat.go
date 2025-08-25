@@ -1,29 +1,36 @@
 package wireguard
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing-tun/ping"
 	"github.com/sagernet/sing/common/buf"
+	"github.com/sagernet/sing/common/logger"
 )
 
 var _ Device = (*natDeviceWrapper)(nil)
 
 type natDeviceWrapper struct {
 	Device
+	ctx            context.Context
+	logger         logger.ContextLogger
 	packetOutbound chan *buf.Buffer
 	rewriter       *ping.Rewriter
 	buffer         [][]byte
 }
 
-func NewNATDevice(upstream Device) NatDevice {
+func NewNATDevice(ctx context.Context, logger logger.ContextLogger, upstream Device) NatDevice {
 	wrapper := &natDeviceWrapper{
 		Device:         upstream,
+		ctx:            ctx,
+		logger:         logger,
 		packetOutbound: make(chan *buf.Buffer, 256),
-		rewriter:       ping.NewRewriter(upstream.Inet4Address(), upstream.Inet6Address()),
+		rewriter:       ping.NewRewriter(ctx, logger, upstream.Inet4Address(), upstream.Inet6Address()),
 	}
 	return wrapper
 }
@@ -61,11 +68,13 @@ func (d *natDeviceWrapper) Write(bufs [][]byte, offset int) (int, error) {
 }
 
 func (d *natDeviceWrapper) CreateDestination(metadata adapter.InboundContext, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
+	ctx := log.ContextWithNewID(d.ctx)
 	session := tun.DirectRouteSession{
 		Source:      metadata.Source.Addr,
 		Destination: metadata.Destination.Addr,
 	}
 	d.rewriter.CreateSession(session, routeContext)
+	d.logger.InfoContext(ctx, "linked ", metadata.Network, " connection from ", metadata.Source.AddrString(), " to ", metadata.Destination.AddrString())
 	return &natDestination{device: d, session: session}, nil
 }
 

@@ -120,7 +120,7 @@ func NewEndpoint(options EndpointOptions) (*Endpoint, error) {
 	}
 	natDevice, isNatDevice := tunDevice.(NatDevice)
 	if !isNatDevice {
-		natDevice = NewNATDevice(tunDevice)
+		natDevice = NewNATDevice(options.Context, options.Logger, tunDevice)
 	}
 	return &Endpoint{
 		options:        options,

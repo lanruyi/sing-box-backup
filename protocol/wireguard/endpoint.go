@@ -223,10 +223,5 @@ func (w *Endpoint) PreferredAddress(address netip.Addr) bool {
 }
 
 func (w *Endpoint) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
-	destination, err := w.endpoint.NewDirectRouteConnection(metadata, routeContext, timeout)
-	if err != nil {
-		return nil, err
-	}
-	w.logger.Info("linked ", metadata.Network, " connection to ", metadata.Destination.AddrString())
-	return destination, nil
+	return w.endpoint.NewDirectRouteConnection(metadata, routeContext, timeout)
 }

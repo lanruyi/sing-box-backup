@@ -31,6 +31,7 @@ import (
 	"github.com/sagernet/sing-box/experimental/libbox/platform"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-box/route/rule"
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing-tun/ping"
 	"github.com/sagernet/sing/common"
@@ -181,7 +182,7 @@ func NewEndpoint(ctx context.Context, router adapter.Router, logger log.ContextL
 		},
 	}
 	return &Endpoint{
-		Adapter:                endpoint.NewAdapter(C.TypeTailscale, tag, []string{N.NetworkTCP, N.NetworkUDP, N.NetworkICMPv4, N.NetworkICMPv6}, nil),
+		Adapter:                endpoint.NewAdapter(C.TypeTailscale, tag, []string{N.NetworkTCP, N.NetworkUDP, N.NetworkICMP}, nil),
 		ctx:                    ctx,
 		router:                 router,
 		logger:                 logger,
@@ -433,6 +434,12 @@ func (t *Endpoint) PrepareConnection(network string, source M.Socksaddr, destina
 			ipProto = ipproto.TCP
 		case N.NetworkUDP:
 			ipProto = ipproto.UDP
+		case N.NetworkICMP:
+			if !destination.IsIPv6() {
+				ipProto = ipproto.ICMPv4
+			} else {
+				ipProto = ipproto.ICMPv6
+			}
 		}
 		response := tsFilter.Check(source.Addr, destination.Addr, destination.Port, ipProto)
 		switch response {
@@ -442,13 +449,26 @@ func (t *Endpoint) PrepareConnection(network string, source M.Socksaddr, destina
 			return nil, tun.ErrDrop
 		}
 	}
-	return t.router.PreMatch(adapter.InboundContext{
+	var ipVersion uint8
+	if !destination.IsIPv6() {
+		ipVersion = 4
+	} else {
+		ipVersion = 6
+	}
+	routeDestination, err := t.router.PreMatch(adapter.InboundContext{
 		Inbound:     t.Tag(),
 		InboundType: t.Type(),
+		IPVersion:   ipVersion,
 		Network:     network,
 		Source:      source,
 		Destination: destination,
 	}, routeContext, timeout)
+	if err != nil {
+		if !rule.IsRejected(err) {
+			t.logger.Warn(E.Cause(err, "link ", network, " connection from ", source.AddrString(), " to ", destination.AddrString()))
+		}
+	}
+	return routeDestination, err
 }
 
 func (t *Endpoint) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {

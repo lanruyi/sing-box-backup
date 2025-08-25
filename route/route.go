@@ -282,7 +282,7 @@ func (r *Router) PreMatch(metadata adapter.InboundContext, routeContext tun.Dire
 			return outbound.(adapter.DirectRouteOutbound).NewDirectRouteConnection(metadata, routeContext, timeout)
 		}
 	}
-	if selectedRule != nil || metadata.Network != N.NetworkICMPv4 && metadata.Network != N.NetworkICMPv6 {
+	if selectedRule != nil || metadata.Network != N.NetworkICMP {
 		return nil, nil
 	}
 	defaultOutbound := r.outbound.Default()

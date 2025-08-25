@@ -317,8 +317,8 @@ func (d *DefaultDialer) ListenPacket(ctx context.Context, destination M.Socksadd
 	}
 }
 
-func (d *DefaultDialer) DialerForICMPNetwork(network string) net.Dialer {
-	if network == N.NetworkICMPv6 {
+func (d *DefaultDialer) DialerForICMPDestination(destination netip.Addr) net.Dialer {
+	if !destination.Is6() {
 		return dialerFromTCPDialer(d.dialer6)
 	} else {
 		return dialerFromTCPDialer(d.dialer4)

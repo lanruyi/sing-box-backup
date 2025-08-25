@@ -151,9 +151,9 @@ func (h *Outbound) ListenPacket(ctx context.Context, destination M.Socksaddr) (n
 	return conn, nil
 }
 
-func (h *Outbound) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
+func (h *Outbound) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
 	ctx := log.ContextWithNewID(h.ctx)
-	destination, err := ping.ConnectDestination(ctx, h.logger, common.MustCast[*dialer.DefaultDialer](h.dialer).DialerForICMPNetwork(metadata.Network).Control, metadata.Destination.Addr, routeContext)
+	destination, err := ping.ConnectDestination(ctx, h.logger, common.MustCast[*dialer.DefaultDialer](h.dialer).DialerForICMPNetwork(metadata.Network).Control, metadata.Destination.Addr, routeContext, timeout)
 	if err != nil {
 		return nil, err
 	}

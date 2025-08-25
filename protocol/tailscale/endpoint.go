@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing-tun/ping"
 	"github.com/sagernet/sing/common"
-	"github.com/sagernet/sing/common/atomic"
 	"github.com/sagernet/sing/common/bufio"
 	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -87,7 +87,7 @@ type Endpoint struct {
 
 	cfg           *wgcfg.Config
 	dnsCfg        *tsDNS.Config
-	routeDomains  atomic.TypedValue[map[string]bool]
+	routeDomains  common.TypedValue[map[string]bool]
 	routePrefixes atomic.Pointer[netipx.IPSet]
 
 	acceptRoutes           bool
@@ -272,7 +272,7 @@ func (t *Endpoint) Start(stage adapter.StartStage) error {
 	if err != nil {
 		return E.Cause(err, "update prefs")
 	}
-	t.filter = atomic.PointerForm(localBackend.ExportFilter())
+	t.filter = localBackend.ExportFilter()
 	go t.watchState()
 	return nil
 }
@@ -424,7 +424,7 @@ func (t *Endpoint) ListenPacket(ctx context.Context, destination M.Socksaddr) (n
 	return udpConn, nil
 }
 
-func (t *Endpoint) PrepareConnection(network string, source M.Socksaddr, destination M.Socksaddr, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
+func (t *Endpoint) PrepareConnection(network string, source M.Socksaddr, destination M.Socksaddr, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
 	tsFilter := t.filter.Load()
 	if tsFilter != nil {
 		var ipProto ipproto.Proto
@@ -448,7 +448,7 @@ func (t *Endpoint) PrepareConnection(network string, source M.Socksaddr, destina
 		Network:     network,
 		Source:      source,
 		Destination: destination,
-	}, routeContext)
+	}, routeContext, timeout)
 }
 
 func (t *Endpoint) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {
@@ -491,7 +491,7 @@ func (t *Endpoint) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn,
 	t.router.RoutePacketConnectionEx(ctx, conn, metadata, onClose)
 }
 
-func (t *Endpoint) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
+func (t *Endpoint) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
 	inet4Address, inet6Address := t.server.TailscaleIPs()
 	if metadata.Destination.Addr.Is4() && !inet4Address.IsValid() || metadata.Destination.Addr.Is6() && !inet6Address.IsValid() {
 		return nil, E.New("Tailscale is not ready yet")
@@ -503,6 +503,7 @@ func (t *Endpoint) NewDirectRouteConnection(metadata adapter.InboundContext, rou
 		routeContext,
 		t.stack,
 		inet4Address, inet6Address,
+		timeout,
 	)
 	if err != nil {
 		return nil, err

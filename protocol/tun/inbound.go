@@ -455,7 +455,7 @@ func (t *Inbound) Close() error {
 	)
 }
 
-func (t *Inbound) PrepareConnection(network string, source M.Socksaddr, destination M.Socksaddr, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
+func (t *Inbound) PrepareConnection(network string, source M.Socksaddr, destination M.Socksaddr, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
 	routeDestination, err := t.router.PreMatch(adapter.InboundContext{
 		Inbound:        t.tag,
 		InboundType:    C.TypeTun,
@@ -463,7 +463,7 @@ func (t *Inbound) PrepareConnection(network string, source M.Socksaddr, destinat
 		Source:         source,
 		Destination:    destination,
 		InboundOptions: t.inboundOptions,
-	}, routeContext)
+	}, routeContext, timeout)
 	if err != nil {
 		if !E.IsMulti(err, tun.ErrDrop, syscall.ECONNREFUSED) {
 			t.logger.Warn(E.Cause(err, "link ", network, " connection from ", source, " to ", destination))

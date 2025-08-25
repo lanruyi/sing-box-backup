@@ -125,14 +125,14 @@ func (w *Endpoint) Close() error {
 	return w.endpoint.Close()
 }
 
-func (w *Endpoint) PrepareConnection(network string, source M.Socksaddr, destination M.Socksaddr, context tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
+func (w *Endpoint) PrepareConnection(network string, source M.Socksaddr, destination M.Socksaddr, context tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
 	return w.router.PreMatch(adapter.InboundContext{
 		Inbound:     w.Tag(),
 		InboundType: w.Type(),
 		Network:     network,
 		Source:      source,
 		Destination: destination,
-	}, context)
+	}, context, timeout)
 }
 
 func (w *Endpoint) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {
@@ -222,8 +222,8 @@ func (w *Endpoint) PreferredAddress(address netip.Addr) bool {
 	return w.endpoint.Lookup(address) != nil
 }
 
-func (w *Endpoint) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
-	destination, err := w.endpoint.NewDirectRouteConnection(metadata, routeContext)
+func (w *Endpoint) NewDirectRouteConnection(metadata adapter.InboundContext, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
+	destination, err := w.endpoint.NewDirectRouteConnection(metadata, routeContext, timeout)
 	if err != nil {
 		return nil, err
 	}

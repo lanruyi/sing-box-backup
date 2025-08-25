@@ -1,6 +1,9 @@
 package wireguard
 
 import (
+	"sync/atomic"
+	"time"
+
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-tun"
 	"github.com/sagernet/sing-tun/ping"
@@ -57,13 +60,13 @@ func (d *natDeviceWrapper) Write(bufs [][]byte, offset int) (int, error) {
 	return 0, nil
 }
 
-func (d *natDeviceWrapper) CreateDestination(metadata adapter.InboundContext, routeContext tun.DirectRouteContext) (tun.DirectRouteDestination, error) {
+func (d *natDeviceWrapper) CreateDestination(metadata adapter.InboundContext, routeContext tun.DirectRouteContext, timeout time.Duration) (tun.DirectRouteDestination, error) {
 	session := tun.DirectRouteSession{
 		Source:      metadata.Source.Addr,
 		Destination: metadata.Destination.Addr,
 	}
 	d.rewriter.CreateSession(session, routeContext)
-	return &natDestination{d, session}, nil
+	return &natDestination{device: d, session: session}, nil
 }
 
 var _ tun.DirectRouteDestination = (*natDestination)(nil)
@@ -71,6 +74,7 @@ var _ tun.DirectRouteDestination = (*natDestination)(nil)
 type natDestination struct {
 	device  *natDeviceWrapper
 	session tun.DirectRouteSession
+	closed  atomic.Bool
 }
 
 func (d *natDestination) WritePacket(buffer *buf.Buffer) error {
@@ -80,6 +84,11 @@ func (d *natDestination) WritePacket(buffer *buf.Buffer) error {
 }
 
 func (d *natDestination) Close() error {
+	d.closed.Store(true)
 	d.device.rewriter.DeleteSession(d.session)
 	return nil
+}
+
+func (d *natDestination) IsClosed() bool {
+	return d.closed.Load()
 }

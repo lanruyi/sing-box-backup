@@ -11,7 +11,7 @@ icon: material/alert-decagram
 
 You can now match ICMP echo (ping) requests using the new `icmp` network in routing rules.
 
-This traffic originates from `TUN`, `WireGuard`, and `Tailscale` inbound and can be routed to `Direct`, `WireGuard`, and `Tailscale` outbound.
+Such traffic originates from `TUN`, `WireGuard`, and `Tailscale` inbounds and can be routed to `Direct`, `WireGuard`, and `Tailscale` outbounds.
 
 See [Route Rule](/configuration/route/rule/#network).
 

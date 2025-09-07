@@ -47,11 +47,11 @@ func ClientHandshake(ctx context.Context, conn net.Conn, config Config) (Conn, e
 	if err != nil {
 		return nil, err
 	}
-	if kConfig, isKConfig := config.(KTLSCapableConfig); isKConfig && kConfig.KTLSEnabled() {
+	if kConfig, isKConfig := config.(KTLSCapableConfig); isKConfig && (kConfig.KernelTx() || kConfig.KernelRx()) {
 		if !C.IsLinux {
 			return nil, E.New("kTLS is only supported on Linux")
 		}
-		return ktls.NewConn(tlsConn, true, false)
+		return ktls.NewConn(tlsConn, kConfig.KernelTx(), kConfig.KernelRx())
 	}
 	readWaitConn, err := badtls.NewReadWaitConn(tlsConn)
 	if err == nil {

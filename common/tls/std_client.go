@@ -22,7 +22,7 @@ type STDClientConfig struct {
 	fragment              bool
 	fragmentFallbackDelay time.Duration
 	recordFragment        bool
-	ktls                  bool
+	kernelTx, kernelRx    bool
 }
 
 func (c *STDClientConfig) ServerName() string {
@@ -59,7 +59,8 @@ func (c *STDClientConfig) Clone() Config {
 		fragment:              c.fragment,
 		fragmentFallbackDelay: c.fragmentFallbackDelay,
 		recordFragment:        c.recordFragment,
-		ktls:                  c.ktls,
+		kernelTx:              c.kernelTx,
+		kernelRx:              c.kernelRx,
 	}
 }
 
@@ -71,8 +72,12 @@ func (c *STDClientConfig) SetECHConfigList(EncryptedClientHelloConfigList []byte
 	c.config.EncryptedClientHelloConfigList = EncryptedClientHelloConfigList
 }
 
-func (c *STDClientConfig) KTLSEnabled() bool {
-	return c.ktls
+func (c *STDClientConfig) KernelTx() bool {
+	return c.kernelTx
+}
+
+func (c *STDClientConfig) KernelRx() bool {
+	return c.kernelRx
 }
 
 func NewSTDClient(ctx context.Context, serverAddress string, options option.OutboundTLSOptions) (Config, error) {
@@ -164,7 +169,8 @@ func NewSTDClient(ctx context.Context, serverAddress string, options option.Outb
 		fragment:              options.Fragment,
 		fragmentFallbackDelay: time.Duration(options.FragmentFallbackDelay),
 		recordFragment:        options.RecordFragment,
-		ktls:                  options.KTLS,
+		kernelTx:              options.KernelTx,
+		kernelRx:              options.KernelRx,
 	}
 	if options.ECH != nil && options.ECH.Enabled {
 		return parseECHClientConfig(ctx, stdConfig, options)

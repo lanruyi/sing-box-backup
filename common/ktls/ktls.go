@@ -76,7 +76,7 @@ func (c *Conn) Upstream() any {
 }
 
 func (c *Conn) ReaderReplaceable() bool {
-	return c.kernelRx && *c.rawConn.IsClient
+	return c.kernelRx
 }
 
 func (c *Conn) WriterReplaceable() bool {

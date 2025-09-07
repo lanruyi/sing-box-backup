@@ -23,7 +23,8 @@ type (
 
 type KTLSCapableConfig interface {
 	Config
-	KTLSEnabled() bool
+	KernelTx() bool
+	KernelRx() bool
 }
 
 func ParseTLSVersion(version string) (uint16, error) {

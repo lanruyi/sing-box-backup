@@ -3,6 +3,7 @@ package tls
 import (
 	"context"
 	"crypto/tls"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -53,6 +54,14 @@ func (c *STDServerConfig) SetNextProtos(nextProto []string) {
 	} else {
 		c.config.NextProtos = nextProto
 	}
+}
+
+func (c *STDServerConfig) KeyLogWriter() io.Writer {
+	return c.config.KeyLogWriter
+}
+
+func (c *STDServerConfig) SetKeyLogWriter(writer io.Writer) {
+	c.config.KeyLogWriter = writer
 }
 
 func (c *STDServerConfig) Config() (*STDConfig, error) {

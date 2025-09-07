@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -40,6 +41,14 @@ func (c *STDClientConfig) SetNextProtos(nextProto []string) {
 	c.config.NextProtos = nextProto
 }
 
+func (c *STDClientConfig) KeyLogWriter() io.Writer {
+	return c.config.KeyLogWriter
+}
+
+func (c *STDClientConfig) SetKeyLogWriter(writer io.Writer) {
+	c.config.KeyLogWriter = writer
+}
+
 func (c *STDClientConfig) Config() (*STDConfig, error) {
 	return c.config, nil
 }
@@ -52,7 +61,13 @@ func (c *STDClientConfig) Client(conn net.Conn) (Conn, error) {
 }
 
 func (c *STDClientConfig) Clone() Config {
-	return &STDClientConfig{c.ctx, c.config.Clone(), c.fragment, c.fragmentFallbackDelay, c.recordFragment}
+	return &STDClientConfig{
+		ctx:                   c.ctx,
+		config:                c.config.Clone(),
+		fragment:              c.fragment,
+		fragmentFallbackDelay: c.fragmentFallbackDelay,
+		recordFragment:        c.recordFragment,
+	}
 }
 
 func (c *STDClientConfig) ECHConfigList() []byte {
@@ -146,7 +161,13 @@ func NewSTDClient(ctx context.Context, serverAddress string, options option.Outb
 		}
 		tlsConfig.RootCAs = certPool
 	}
-	stdConfig := &STDClientConfig{ctx, &tlsConfig, options.Fragment, time.Duration(options.FragmentFallbackDelay), options.RecordFragment}
+	stdConfig := &STDClientConfig{
+		ctx:                   ctx,
+		config:                &tlsConfig,
+		fragment:              options.Fragment,
+		fragmentFallbackDelay: time.Duration(options.FragmentFallbackDelay),
+		recordFragment:        options.RecordFragment,
+	}
 	if options.ECH != nil && options.ECH.Enabled {
 		return parseECHClientConfig(ctx, stdConfig, options)
 	} else {

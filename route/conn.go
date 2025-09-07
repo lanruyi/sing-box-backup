@@ -229,6 +229,21 @@ func (m *ConnectionManager) connectionCopy(ctx context.Context, source net.Conn,
 		sourceReader      io.Reader = source
 		destinationWriter io.Writer = destination
 	)
+	if earlyConn, isEarlyConn := common.Cast[N.EarlyConn](destinationWriter); isEarlyConn && earlyConn.NeedHandshake() {
+		err := m.connectionCopyEarly(source, destination)
+		if err != nil {
+			if done.Swap(true) {
+				onClose(err)
+			}
+			common.Close(source, destination)
+			if !direction {
+				m.logger.ErrorContext(ctx, "connection upload handshake: ", err)
+			} else {
+				m.logger.ErrorContext(ctx, "connection download handshake: ", err)
+			}
+			return
+		}
+	}
 	var readCounters, writeCounters []N.CountFunc
 	for {
 		sourceReader, readCounters = N.UnwrapCountReader(sourceReader, readCounters)
@@ -262,21 +277,7 @@ func (m *ConnectionManager) connectionCopy(ctx context.Context, source net.Conn,
 		}
 		break
 	}
-	if earlyConn, isEarlyConn := common.Cast[N.EarlyConn](destinationWriter); isEarlyConn && earlyConn.NeedHandshake() {
-		err := m.connectionCopyEarly(source, destination)
-		if err != nil {
-			if done.Swap(true) {
-				onClose(err)
-			}
-			common.Close(source, destination)
-			if !direction {
-				m.logger.ErrorContext(ctx, "connection upload handshake: ", err)
-			} else {
-				m.logger.ErrorContext(ctx, "connection download handshake: ", err)
-			}
-			return
-		}
-	}
+
 	_, err := bufio.CopyWithCounters(destinationWriter, sourceReader, source, readCounters, writeCounters, bufio.DefaultIncreaseBufferAfter, bufio.DefaultBatchSize)
 	if err != nil {
 		common.Close(source, destination)

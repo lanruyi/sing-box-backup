@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -48,6 +49,14 @@ func (c *UTLSClientConfig) SetNextProtos(nextProto []string) {
 		nextProto = append(nextProto, "http/1.1")
 	}
 	c.config.NextProtos = nextProto
+}
+
+func (c *UTLSClientConfig) KeyLogWriter() io.Writer {
+	return c.config.KeyLogWriter
+}
+
+func (c *UTLSClientConfig) SetKeyLogWriter(writer io.Writer) {
+	c.config.KeyLogWriter = writer
 }
 
 func (c *UTLSClientConfig) Config() (*STDConfig, error) {

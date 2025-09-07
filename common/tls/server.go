@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/sagernet/sing-box/common/badtls"
+	"github.com/sagernet/sing-box/common/ktls"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
@@ -28,6 +29,14 @@ func ServerHandshake(ctx context.Context, conn net.Conn, config ServerConfig) (C
 	tlsConn, err := aTLS.ServerHandshake(ctx, conn, config)
 	if err != nil {
 		return nil, err
+	}
+	if C.IsLinux {
+		ktlsConn, err := ktls.NewConn(tlsConn, true, false)
+		if err == nil {
+			return ktlsConn, nil
+		} else if err != os.ErrInvalid {
+			return nil, err
+		}
 	}
 	readWaitConn, err := badtls.NewReadWaitConn(tlsConn)
 	if err == nil {

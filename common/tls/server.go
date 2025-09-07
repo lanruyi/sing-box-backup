@@ -10,6 +10,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	E "github.com/sagernet/sing/common/exceptions"
 	aTLS "github.com/sagernet/sing/common/tls"
 )
 
@@ -30,13 +31,11 @@ func ServerHandshake(ctx context.Context, conn net.Conn, config ServerConfig) (C
 	if err != nil {
 		return nil, err
 	}
-	if C.IsLinux {
-		ktlsConn, err := ktls.NewConn(tlsConn, true, false)
-		if err == nil {
-			return ktlsConn, nil
-		} else if err != os.ErrInvalid {
-			return nil, err
+	if kConfig, isKConfig := config.(KTLSCapableConfig); isKConfig && kConfig.KTLSEnabled() {
+		if !C.IsLinux {
+			return nil, E.New("kTLS is only supported on Linux")
 		}
+		return ktls.NewConn(tlsConn, true, false)
 	}
 	readWaitConn, err := badtls.NewReadWaitConn(tlsConn)
 	if err == nil {

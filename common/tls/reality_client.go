@@ -93,14 +93,6 @@ func (e *RealityClientConfig) SetNextProtos(nextProto []string) {
 	e.uClient.SetNextProtos(nextProto)
 }
 
-func (e *RealityClientConfig) KeyLogWriter() io.Writer {
-	return e.uClient.KeyLogWriter()
-}
-
-func (e *RealityClientConfig) SetKeyLogWriter(writer io.Writer) {
-	e.uClient.SetKeyLogWriter(writer)
-}
-
 func (e *RealityClientConfig) Config() (*STDConfig, error) {
 	return nil, E.New("unsupported usage for reality")
 }

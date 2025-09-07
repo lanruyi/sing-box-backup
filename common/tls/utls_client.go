@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -30,6 +29,7 @@ type UTLSClientConfig struct {
 	fragment              bool
 	fragmentFallbackDelay time.Duration
 	recordFragment        bool
+	ktls                  bool
 }
 
 func (c *UTLSClientConfig) ServerName() string {
@@ -51,14 +51,6 @@ func (c *UTLSClientConfig) SetNextProtos(nextProto []string) {
 	c.config.NextProtos = nextProto
 }
 
-func (c *UTLSClientConfig) KeyLogWriter() io.Writer {
-	return c.config.KeyLogWriter
-}
-
-func (c *UTLSClientConfig) SetKeyLogWriter(writer io.Writer) {
-	c.config.KeyLogWriter = writer
-}
-
 func (c *UTLSClientConfig) Config() (*STDConfig, error) {
 	return nil, E.New("unsupported usage for uTLS")
 }
@@ -76,7 +68,7 @@ func (c *UTLSClientConfig) SetSessionIDGenerator(generator func(clientHello []by
 
 func (c *UTLSClientConfig) Clone() Config {
 	return &UTLSClientConfig{
-		c.ctx, c.config.Clone(), c.id, c.fragment, c.fragmentFallbackDelay, c.recordFragment,
+		c.ctx, c.config.Clone(), c.id, c.fragment, c.fragmentFallbackDelay, c.recordFragment, c.ktls,
 	}
 }
 
@@ -86,6 +78,10 @@ func (c *UTLSClientConfig) ECHConfigList() []byte {
 
 func (c *UTLSClientConfig) SetECHConfigList(EncryptedClientHelloConfigList []byte) {
 	c.config.EncryptedClientHelloConfigList = EncryptedClientHelloConfigList
+}
+
+func (c *UTLSClientConfig) KTLSEnabled() bool {
+	return c.ktls
 }
 
 type utlsConnWrapper struct {
@@ -223,7 +219,12 @@ func NewUTLSClient(ctx context.Context, serverAddress string, options option.Out
 	if err != nil {
 		return nil, err
 	}
-	uConfig := &UTLSClientConfig{ctx, &tlsConfig, id, options.Fragment, time.Duration(options.FragmentFallbackDelay), options.RecordFragment}
+	uConfig := &UTLSClientConfig{ctx, &tlsConfig, id, options.Fragment, time.Duration(options.FragmentFallbackDelay), options.RecordFragment, options.KTLS}
+	if uConfig.ktls {
+		if options.Reality != nil && options.Reality.Enabled {
+			return nil, E.New("Reality is conflict with kTLS")
+		}
+	}
 	if options.ECH != nil && options.ECH.Enabled {
 		if options.Reality != nil && options.Reality.Enabled {
 			return nil, E.New("Reality is conflict with ECH")

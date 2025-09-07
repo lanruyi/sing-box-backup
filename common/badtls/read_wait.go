@@ -44,12 +44,12 @@ func (c *ReadWaitConn) WaitReadBuffer() (buffer *buf.Buffer, err error) {
 		if err != nil {
 			return
 		}
-		//for c.rawConn.Hand.Len() > 0 {
-		//	err = c.rawConn.HandlePostHandshakeMessage()
-		//	if err != nil {
-		//		return
-		//	}
-		//}
+		for c.rawConn.Hand.Len() > 0 {
+			err = c.rawConn.HandlePostHandshakeMessage()
+			if err != nil {
+				return
+			}
+		}
 	}
 	buffer = c.readWaitOptions.NewBuffer()
 	n, err := c.rawConn.Input.Read(buffer.FreeBytes())

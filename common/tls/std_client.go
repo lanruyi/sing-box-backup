@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -23,6 +22,7 @@ type STDClientConfig struct {
 	fragment              bool
 	fragmentFallbackDelay time.Duration
 	recordFragment        bool
+	ktls                  bool
 }
 
 func (c *STDClientConfig) ServerName() string {
@@ -39,14 +39,6 @@ func (c *STDClientConfig) NextProtos() []string {
 
 func (c *STDClientConfig) SetNextProtos(nextProto []string) {
 	c.config.NextProtos = nextProto
-}
-
-func (c *STDClientConfig) KeyLogWriter() io.Writer {
-	return c.config.KeyLogWriter
-}
-
-func (c *STDClientConfig) SetKeyLogWriter(writer io.Writer) {
-	c.config.KeyLogWriter = writer
 }
 
 func (c *STDClientConfig) Config() (*STDConfig, error) {
@@ -67,6 +59,7 @@ func (c *STDClientConfig) Clone() Config {
 		fragment:              c.fragment,
 		fragmentFallbackDelay: c.fragmentFallbackDelay,
 		recordFragment:        c.recordFragment,
+		ktls:                  c.ktls,
 	}
 }
 
@@ -76,6 +69,10 @@ func (c *STDClientConfig) ECHConfigList() []byte {
 
 func (c *STDClientConfig) SetECHConfigList(EncryptedClientHelloConfigList []byte) {
 	c.config.EncryptedClientHelloConfigList = EncryptedClientHelloConfigList
+}
+
+func (c *STDClientConfig) KTLSEnabled() bool {
+	return c.ktls
 }
 
 func NewSTDClient(ctx context.Context, serverAddress string, options option.OutboundTLSOptions) (Config, error) {
@@ -167,6 +164,7 @@ func NewSTDClient(ctx context.Context, serverAddress string, options option.Outb
 		fragment:              options.Fragment,
 		fragmentFallbackDelay: time.Duration(options.FragmentFallbackDelay),
 		recordFragment:        options.RecordFragment,
+		ktls:                  options.KTLS,
 	}
 	if options.ECH != nil && options.ECH.Enabled {
 		return parseECHClientConfig(ctx, stdConfig, options)

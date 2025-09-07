@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net"
 	"time"
 
@@ -129,14 +128,6 @@ func (c *RealityServerConfig) ServerName() string {
 
 func (c *RealityServerConfig) SetServerName(serverName string) {
 	c.config.ServerName = serverName
-}
-
-func (c *RealityServerConfig) KeyLogWriter() io.Writer {
-	return c.config.KeyLogWriter
-}
-
-func (c *RealityServerConfig) SetKeyLogWriter(writer io.Writer) {
-	c.config.KeyLogWriter = writer
 }
 
 func (c *RealityServerConfig) NextProtos() []string {

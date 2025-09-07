@@ -50,6 +50,7 @@ type OutboundTLSOptions struct {
 	Fragment              bool                       `json:"fragment,omitempty"`
 	FragmentFallbackDelay badoption.Duration         `json:"fragment_fallback_delay,omitempty"`
 	RecordFragment        bool                       `json:"record_fragment,omitempty"`
+	KTLS                  bool                       `json:"ktls,omitempty"`
 	ECH                   *OutboundECHOptions        `json:"ech,omitempty"`
 	UTLS                  *OutboundUTLSOptions       `json:"utls,omitempty"`
 	Reality               *OutboundRealityOptions    `json:"reality,omitempty"`

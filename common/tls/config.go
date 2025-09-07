@@ -21,6 +21,11 @@ type (
 	CurveID         = tls.CurveID
 )
 
+type KTLSCapableConfig interface {
+	Config
+	KTLSEnabled() bool
+}
+
 func ParseTLSVersion(version string) (uint16, error) {
 	switch version {
 	case "1.0":

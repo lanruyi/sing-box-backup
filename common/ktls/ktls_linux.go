@@ -125,41 +125,43 @@ func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 
 	if rxOffload {
 		rxCrypto := kernelCipher(support, c.rawConn.In, *c.rawConn.CipherSuite, true)
-		if rxCrypto != nil {
-			err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
-				return syscall.SetsockoptString(int(fd), unix.SOL_TLS, TLS_RX, rxCrypto.String())
-			})
-			if err != nil {
-				return err
-			}
-			if /*config.KernelRXExpectNoPad &&*/ *c.rawConn.Vers >= tls.VersionTLS13 && support.TLS_RX_NOPADDING {
-				err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
-					return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_RX_EXPECT_NO_PAD, 1)
-				})
-			}
-			c.kernelRx = true
+		if rxCrypto == nil {
+			return E.New("kTLS: unsupported cipher suite")
 		}
+		err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
+			return syscall.SetsockoptString(int(fd), unix.SOL_TLS, TLS_RX, rxCrypto.String())
+		})
+		if err != nil {
+			return err
+		}
+		if /*config.KernelRXExpectNoPad &&*/ *c.rawConn.Vers >= tls.VersionTLS13 && support.TLS_RX_NOPADDING {
+			err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
+				return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_RX_EXPECT_NO_PAD, 1)
+			})
+		}
+		c.kernelRx = true
 	}
 
 	if txOffload {
 		txCrypto := kernelCipher(support, c.rawConn.Out, *c.rawConn.CipherSuite, false)
-		if txCrypto != nil {
+		if txCrypto == nil {
+			return E.New("kTLS: unsupported cipher suite")
+		}
+		err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
+			return syscall.SetsockoptString(int(fd), unix.SOL_TLS, TLS_TX, txCrypto.String())
+		})
+		if err != nil {
+			return err
+		}
+		if support.TLS_TX_ZEROCOPY {
 			err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
-				return syscall.SetsockoptString(int(fd), unix.SOL_TLS, TLS_TX, txCrypto.String())
+				return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_TX_ZEROCOPY_RO, 1)
 			})
 			if err != nil {
 				return err
 			}
-			if support.TLS_TX_ZEROCOPY {
-				err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
-					return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_TX_ZEROCOPY_RO, 1)
-				})
-				if err != nil {
-					return err
-				}
-			}
-			c.kernelTx = true
 		}
+		c.kernelTx = true
 	}
 
 	return nil

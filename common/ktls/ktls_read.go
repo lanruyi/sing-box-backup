@@ -77,10 +77,10 @@ func (c *Conn) readRecord() error {
 		return c.rawConn.In.SetErrorLocked(c.sendAlert(alertUnexpectedMessage))
 	}
 
-	if typ != recordTypeAlert && typ != recordTypeChangeCipherSpec && len(data) > 0 {
-		// This is a state-advancing message: reset the retry count.
-		// c.retryCount = 0
-	}
+	//if typ != recordTypeAlert && typ != recordTypeChangeCipherSpec && len(data) > 0 {
+	// This is a state-advancing message: reset the retry count.
+	// c.retryCount = 0
+	//}
 
 	// Handshake messages MUST NOT be interleaved with other record types in TLS 1.3.
 	if *c.rawConn.Vers == tls.VersionTLS13 && typ != recordTypeHandshake && c.rawConn.Hand.Len() > 0 {
@@ -165,6 +165,7 @@ func (c *Conn) readRecord() error {
 	return nil
 }
 
+//nolint:staticcheck
 func (c *Conn) readRawRecord() (typ uint8, data []byte, err error) {
 	// Read from kernel.
 	if c.kernelRx {

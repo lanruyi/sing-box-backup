@@ -1,3 +1,5 @@
+//go:build linux && go1.25 && !without_badtls
+
 package ktls
 
 import (
@@ -138,6 +140,9 @@ func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 			err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
 				return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_RX_EXPECT_NO_PAD, 1)
 			})
+			if err != nil {
+				return err
+			}
 		}
 		c.kernelRx = true
 	}

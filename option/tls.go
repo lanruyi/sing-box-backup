@@ -14,6 +14,7 @@ type InboundTLSOptions struct {
 	CertificatePath string                     `json:"certificate_path,omitempty"`
 	Key             badoption.Listable[string] `json:"key,omitempty"`
 	KeyPath         string                     `json:"key_path,omitempty"`
+	KTLS            bool                       `json:"ktls,omitempty"`
 	ACME            *InboundACMEOptions        `json:"acme,omitempty"`
 	ECH             *InboundECHOptions         `json:"ech,omitempty"`
 	Reality         *InboundRealityOptions     `json:"reality,omitempty"`

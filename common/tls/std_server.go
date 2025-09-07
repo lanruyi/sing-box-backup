@@ -21,8 +21,8 @@ var errInsecureUnused = E.New("tls: insecure unused")
 
 type STDServerConfig struct {
 	config          *tls.Config
-	ktls            bool
 	logger          log.Logger
+	ktls            bool
 	acmeService     adapter.SimpleLifecycle
 	certificate     []byte
 	key             []byte
@@ -271,6 +271,7 @@ func NewSTDServer(ctx context.Context, logger log.Logger, options option.Inbound
 	return &STDServerConfig{
 		config:          tlsConfig,
 		logger:          logger,
+		ktls:            options.KTLS,
 		acmeService:     acmeService,
 		certificate:     certificate,
 		key:             key,

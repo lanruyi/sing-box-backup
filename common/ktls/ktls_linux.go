@@ -2,7 +2,6 @@ package ktls
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -112,9 +111,6 @@ func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 	if err != nil {
 		return err
 	}
-	encoder := json.NewEncoder(os.Stderr)
-	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(support)
 	if !support.TLS {
 		return nil
 	}

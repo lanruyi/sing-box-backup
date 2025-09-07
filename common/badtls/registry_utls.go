@@ -1,3 +1,5 @@
+//go:build go1.25 && !without_badtls
+
 package badtls
 
 import (

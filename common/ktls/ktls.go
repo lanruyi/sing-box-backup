@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/sagernet/sing-box/common/badtls"
-	// C "github.com/sagernet/sing-box/constant"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
@@ -29,8 +28,6 @@ type Conn struct {
 	readWaitOptions N.ReadWaitOptions
 	kernelTx        bool
 	kernelRx        bool
-	kernelDidRead   bool
-	kernelDidWrite  bool
 }
 
 func NewConn(ctx context.Context, logger logger.ContextLogger, conn aTLS.Conn, txOffload, rxOffload bool) (aTLS.Conn, error) {
@@ -85,36 +82,15 @@ func NewConn(ctx context.Context, logger logger.ContextLogger, conn aTLS.Conn, t
 }
 
 func (c *Conn) Upstream() any {
-	return c.conn
-}
-
-func (c *Conn) ReaderReplaceable() bool {
-	if !c.kernelRx {
-		return true
-	}
-	c.rawConn.In.Lock()
-	defer c.rawConn.In.Unlock()
-	return !c.kernelDidRead
-}
-
-func (c *Conn) WriterReplaceable() bool {
-	if !c.kernelTx {
-		return true
-	}
-	/*c.rawConn.Out.Lock()
-	defer c.rawConn.Out.Unlock()
-	return !c.kernelDidWrite*/
-	return true
+	return c.Conn
 }
 
 func (c *Conn) SyscallConnForRead() syscall.Conn {
 	if !c.kernelRx {
 		return nil
 	}
-	c.rawConn.In.Lock()
-	defer c.rawConn.In.Unlock()
-	if c.kernelDidRead {
-		c.logger.DebugContext(c.ctx, "ktls: RX splice not possible, since did read from user space")
+	if !*c.rawConn.IsClient {
+		c.logger.WarnContext(c.ctx, "ktls: RX splice is unavailable on the server size, since it will cause an unknown failure")
 		return nil
 	}
 	c.logger.DebugContext(c.ctx, "ktls: RX splice requested")
@@ -125,13 +101,6 @@ func (c *Conn) SyscallConnForWrite() syscall.Conn {
 	if !c.kernelTx {
 		return nil
 	}
-	/*c.rawConn.Out.Lock()
-	defer c.rawConn.Out.Unlock()
-	if c.kernelDidWrite {
-		c.logger.DebugContext(c.ctx, "ktls: TX splice not possible, since did write from user space")
-		return nil
-	}
-	*/
 	c.logger.DebugContext(c.ctx, "ktls: TX splice requested")
 	return c.syscallConn
 }

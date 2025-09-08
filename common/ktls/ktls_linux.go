@@ -278,7 +278,6 @@ func (c *Conn) readKernelRecord() (uint8, []byte, error) {
 	default:
 		return 0, nil, err
 	}
-	c.kernelDidRead = true
 
 	if n <= 0 {
 		return 0, nil, io.EOF
@@ -324,7 +323,6 @@ func (c *Conn) writeKernelRecord(typ uint16, data []byte) (int, error) {
 	if ew != nil {
 		return 0, ew
 	}
-	c.kernelDidWrite = true
 	return n, err
 }
 

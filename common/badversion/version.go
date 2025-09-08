@@ -81,6 +81,10 @@ func parsePreReleaseIdentifier(identifier string) int {
 	return 0
 }
 
+func (v Version) VersionString() string {
+	return F.ToString(v.Major, ".", v.Minor, ".", v.Patch)
+}
+
 func (v Version) String() string {
 	version := F.ToString(v.Major, ".", v.Minor, ".", v.Patch)
 	if v.PreReleaseIdentifier != "" {

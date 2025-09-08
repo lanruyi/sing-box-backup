@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/blang/semver/v4"
 	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/shell"
+
+	"github.com/blang/semver/v4"
 	"golang.org/x/sys/unix"
 )
 
@@ -105,8 +106,9 @@ var KernelSupport = sync.OnceValues(func() (*Support, error) {
 				if err != nil {
 					return nil, E.Extend(E.Cause(err, "modprobe tls"), output)
 				}
+			} else {
+				return nil, E.New("ktls: kernel TLS module not loaded")
 			}
-			return nil, E.New("ktls: kernel TLS module not loaded")
 		}
 	}
 
@@ -126,14 +128,14 @@ func Load() error {
 
 func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 	if !txOffload && !rxOffload {
-		return nil
+		return os.ErrInvalid
 	}
 	support, err := KernelSupport()
 	if err != nil {
 		return err
 	}
 	if !support.TLS || !support.TLS_Version13 {
-		return nil
+		return E.New("ktls: kernel does not support TLS 1.3")
 	}
 	c.rawConn.Out.Lock()
 	defer c.rawConn.Out.Unlock()
@@ -142,28 +144,6 @@ func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 	})
 	if err != nil {
 		return E.Cause(err, "initialize kernel TLS")
-	}
-
-	if rxOffload {
-		rxCrypto := kernelCipher(support, c.rawConn.In, *c.rawConn.CipherSuite, true)
-		if rxCrypto == nil {
-			return E.New("kTLS: unsupported cipher suite")
-		}
-		err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
-			return syscall.SetsockoptString(int(fd), unix.SOL_TLS, TLS_RX, rxCrypto.String())
-		})
-		if err != nil {
-			return err
-		}
-		if /*config.KernelRXExpectNoPad &&*/ *c.rawConn.Vers >= tls.VersionTLS13 && support.TLS_RX_NOPADDING {
-			err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
-				return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_RX_EXPECT_NO_PAD, 1)
-			})
-			if err != nil {
-				return err
-			}
-		}
-		c.kernelRx = true
 	}
 
 	if txOffload {
@@ -186,8 +166,31 @@ func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 			}
 		}
 		c.kernelTx = true
+		c.logger.DebugContext(c.ctx, "ktls: kernel TLS TX enabled")
 	}
 
+	if rxOffload {
+		rxCrypto := kernelCipher(support, c.rawConn.In, *c.rawConn.CipherSuite, true)
+		if rxCrypto == nil {
+			return E.New("kTLS: unsupported cipher suite")
+		}
+		err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
+			return syscall.SetsockoptString(int(fd), unix.SOL_TLS, TLS_RX, rxCrypto.String())
+		})
+		if err != nil {
+			return err
+		}
+		if *c.rawConn.Vers >= tls.VersionTLS13 && support.TLS_RX_NOPADDING {
+			err = control.Raw(c.rawSyscallConn, func(fd uintptr) error {
+				return syscall.SetsockoptInt(int(fd), unix.SOL_TLS, TLS_RX_EXPECT_NO_PAD, 1)
+			})
+			if err != nil {
+				return err
+			}
+		}
+		c.kernelRx = true
+		c.logger.DebugContext(c.ctx, "ktls: kernel TLS RX enabled")
+	}
 	return nil
 }
 
@@ -275,6 +278,7 @@ func (c *Conn) readKernelRecord() (uint8, []byte, error) {
 	default:
 		return 0, nil, err
 	}
+	c.kernelDidRead = true
 
 	if n <= 0 {
 		return 0, nil, io.EOF
@@ -320,6 +324,7 @@ func (c *Conn) writeKernelRecord(typ uint16, data []byte) (int, error) {
 	if ew != nil {
 		return 0, ew
 	}
+	c.kernelDidWrite = true
 	return n, err
 }
 

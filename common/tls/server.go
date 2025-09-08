@@ -6,15 +6,13 @@ import (
 	"os"
 
 	"github.com/sagernet/sing-box/common/badtls"
-	"github.com/sagernet/sing-box/common/ktls"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
-	E "github.com/sagernet/sing/common/exceptions"
 	aTLS "github.com/sagernet/sing/common/tls"
 )
 
-func NewServer(ctx context.Context, logger log.Logger, options option.InboundTLSOptions) (ServerConfig, error) {
+func NewServer(ctx context.Context, logger log.ContextLogger, options option.InboundTLSOptions) (ServerConfig, error) {
 	if !options.Enabled {
 		return nil, nil
 	}
@@ -30,12 +28,6 @@ func ServerHandshake(ctx context.Context, conn net.Conn, config ServerConfig) (C
 	tlsConn, err := aTLS.ServerHandshake(ctx, conn, config)
 	if err != nil {
 		return nil, err
-	}
-	if kConfig, isKConfig := config.(KTLSCapableConfig); isKConfig && (kConfig.KernelTx() || kConfig.KernelRx()) {
-		if !C.IsLinux {
-			return nil, E.New("kTLS is only supported on Linux")
-		}
-		return ktls.NewConn(tlsConn, kConfig.KernelTx(), kConfig.KernelRx())
 	}
 	readWaitConn, err := badtls.NewReadWaitConn(tlsConn)
 	if err == nil {

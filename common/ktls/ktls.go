@@ -3,6 +3,7 @@
 package ktls
 
 import (
+	"context"
 	"crypto/tls"
 	"io"
 	"net"
@@ -12,14 +13,18 @@ import (
 	"github.com/sagernet/sing-box/common/badtls"
 	// C "github.com/sagernet/sing-box/constant"
 	E "github.com/sagernet/sing/common/exceptions"
+	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
 	aTLS "github.com/sagernet/sing/common/tls"
 )
 
 type Conn struct {
 	aTLS.Conn
+	ctx             context.Context
+	logger          logger.ContextLogger
 	conn            net.Conn
 	rawConn         *badtls.RawConn
+	syscallConn     syscall.Conn
 	rawSyscallConn  syscall.RawConn
 	readWaitOptions N.ReadWaitOptions
 	kernelTx        bool
@@ -28,7 +33,7 @@ type Conn struct {
 	kernelDidWrite  bool
 }
 
-func NewConn(conn aTLS.Conn, txOffload, rxOffload bool) (aTLS.Conn, error) {
+func NewConn(ctx context.Context, logger logger.ContextLogger, conn aTLS.Conn, txOffload, rxOffload bool) (aTLS.Conn, error) {
 	err := Load()
 	if err != nil {
 		return nil, err
@@ -65,8 +70,11 @@ func NewConn(conn aTLS.Conn, txOffload, rxOffload bool) (aTLS.Conn, error) {
 	}
 	kConn := &Conn{
 		Conn:           conn,
+		ctx:            ctx,
+		logger:         logger,
 		conn:           conn.NetConn(),
 		rawConn:        rawConn,
+		syscallConn:    syscallConn,
 		rawSyscallConn: rawSyscallConn,
 	}
 	err = kConn.setupKernel(txOffload, rxOffload)
@@ -82,7 +90,7 @@ func (c *Conn) Upstream() any {
 
 func (c *Conn) ReaderReplaceable() bool {
 	if !c.kernelRx {
-		return false
+		return true
 	}
 	c.rawConn.In.Lock()
 	defer c.rawConn.In.Unlock()
@@ -91,9 +99,39 @@ func (c *Conn) ReaderReplaceable() bool {
 
 func (c *Conn) WriterReplaceable() bool {
 	if !c.kernelTx {
-		return false
+		return true
 	}
-	c.rawConn.Out.Lock()
+	/*c.rawConn.Out.Lock()
 	defer c.rawConn.Out.Unlock()
-	return !c.kernelDidWrite
+	return !c.kernelDidWrite*/
+	return true
+}
+
+func (c *Conn) SyscallConnForRead() syscall.Conn {
+	if !c.kernelRx {
+		return nil
+	}
+	c.rawConn.In.Lock()
+	defer c.rawConn.In.Unlock()
+	if c.kernelDidRead {
+		c.logger.DebugContext(c.ctx, "ktls: RX splice not possible, since did read from user space")
+		return nil
+	}
+	c.logger.DebugContext(c.ctx, "ktls: RX splice requested")
+	return c.syscallConn
+}
+
+func (c *Conn) SyscallConnForWrite() syscall.Conn {
+	if !c.kernelTx {
+		return nil
+	}
+	/*c.rawConn.Out.Lock()
+	defer c.rawConn.Out.Unlock()
+	if c.kernelDidWrite {
+		c.logger.DebugContext(c.ctx, "ktls: TX splice not possible, since did write from user space")
+		return nil
+	}
+	*/
+	c.logger.DebugContext(c.ctx, "ktls: TX splice requested")
+	return c.syscallConn
 }

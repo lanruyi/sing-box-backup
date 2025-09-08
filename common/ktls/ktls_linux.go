@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/blang/semver/v4"
 	"github.com/sagernet/sing/common/control"
 	E "github.com/sagernet/sing/common/exceptions"
-
-	"github.com/blang/semver/v4"
+	"github.com/sagernet/sing/common/shell"
 	"golang.org/x/sys/unix"
 )
 
@@ -48,13 +48,8 @@ type Support struct {
 }
 
 var KernelSupport = sync.OnceValues(func() (*Support, error) {
-	_, err := os.Stat("/sys/module/tls")
-	if err != nil {
-		return nil, E.New("ktls: kernel module tls not found")
-	}
-
 	var uname unix.Utsname
-	err = unix.Uname(&uname)
+	err := unix.Uname(&uname)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +97,32 @@ var KernelSupport = sync.OnceValues(func() (*Support, error) {
 		support.TLS = true
 	}
 
+	if support.TLS && support.TLS_Version13 {
+		_, err := os.Stat("/sys/module/tls")
+		if err != nil {
+			if os.Getuid() == 0 {
+				output, err := shell.Exec("modprobe", "tls").Read()
+				if err != nil {
+					return nil, E.Extend(E.Cause(err, "modprobe tls"), output)
+				}
+			}
+			return nil, E.New("ktls: kernel TLS module not loaded")
+		}
+	}
+
 	return &support, nil
 })
+
+func Load() error {
+	support, err := KernelSupport()
+	if err != nil {
+		return err
+	}
+	if !support.TLS || !support.TLS_Version13 {
+		return E.New("ktls: kernel does not support TLS 1.3")
+	}
+	return nil
+}
 
 func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 	if !txOffload && !rxOffload {
@@ -113,7 +132,7 @@ func (c *Conn) setupKernel(txOffload, rxOffload bool) error {
 	if err != nil {
 		return err
 	}
-	if !support.TLS {
+	if !support.TLS || !support.TLS_Version13 {
 		return nil
 	}
 	c.rawConn.Out.Lock()

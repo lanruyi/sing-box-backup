@@ -24,10 +24,15 @@ type Conn struct {
 	readWaitOptions N.ReadWaitOptions
 	kernelTx        bool
 	kernelRx        bool
-	tmp             [16]byte
+	kernelDidRead   bool
+	kernelDidWrite  bool
 }
 
 func NewConn(conn aTLS.Conn, txOffload, rxOffload bool) (aTLS.Conn, error) {
+	err := Load()
+	if err != nil {
+		return nil, err
+	}
 	syscallConn, isSyscallConn := N.CastReader[interface {
 		io.Reader
 		syscall.Conn
@@ -76,9 +81,19 @@ func (c *Conn) Upstream() any {
 }
 
 func (c *Conn) ReaderReplaceable() bool {
-	return c.kernelRx
+	if !c.kernelRx {
+		return false
+	}
+	c.rawConn.In.Lock()
+	defer c.rawConn.In.Unlock()
+	return !c.kernelDidRead
 }
 
 func (c *Conn) WriterReplaceable() bool {
-	return c.kernelTx
+	if !c.kernelTx {
+		return false
+	}
+	c.rawConn.Out.Lock()
+	defer c.rawConn.Out.Unlock()
+	return !c.kernelDidWrite
 }

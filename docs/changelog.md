@@ -2,6 +2,17 @@
 icon: material/alert-decagram
 ---
 
+#### 1.13.0-alpha.10
+
+* Improve kTLS support **1**
+* Fixes and improvements
+
+**1**:
+
+kTLS is now compatible with custom TLS implementations other than uTLS.
+
+See [TLS](/configuration/shared/tls/).
+
 #### 1.13.0-alpha.9
 
 * Add kTLS support **1**

@@ -11,8 +11,6 @@ icon: material/alert-decagram
 
 kTLS is now compatible with custom TLS implementations other than uTLS.
 
-See [TLS](/configuration/shared/tls/).
-
 #### 1.13.0-alpha.9
 
 * Add kTLS support **1**

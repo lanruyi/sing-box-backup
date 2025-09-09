@@ -122,9 +122,6 @@ func NewRealityServer(ctx context.Context, logger log.Logger, options option.Inb
 	if options.ECH != nil && options.ECH.Enabled {
 		return nil, E.New("Reality is conflict with ECH")
 	}
-	if options.KernelRx || options.KernelTx {
-		return nil, E.New("Reality is conflict with kTLS")
-	}
 
 	return &RealityServerConfig{&tlsConfig}, nil
 }

@@ -227,7 +227,6 @@ func (m *ConnectionManager) NewPacketConnection(ctx context.Context, this N.Dial
 }
 
 func (m *ConnectionManager) preConnectionCopy(ctx context.Context, source net.Conn, destination net.Conn, direction bool, done *atomic.Bool, onClose N.CloseHandlerFunc) {
-	m.logger.ErrorContext(ctx, "need handshake for read: ", N.NeedHandshakeForRead(source), " write: ", N.NeedHandshakeForWrite(destination))
 	readHandshake := N.NeedHandshakeForRead(source)
 	writeHandshake := N.NeedHandshakeForWrite(destination)
 	if readHandshake || writeHandshake {

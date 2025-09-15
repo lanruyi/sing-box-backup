@@ -4,6 +4,7 @@ icon: material/alert-decagram
 
 #### 1.13.0-alpha.15
 
+* Update Tailscale to v1.86.5
 * Fixes and improvements
 
 #### 1.12.8

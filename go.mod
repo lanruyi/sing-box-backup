@@ -1,6 +1,6 @@
 module github.com/sagernet/sing-box
 
-go 1.24.6
+go 1.24.7
 
 require (
 	github.com/anytls/sing-anytls v0.0.8
@@ -25,18 +25,18 @@ require (
 	github.com/sagernet/cors v1.2.1
 	github.com/sagernet/fswatch v0.1.1
 	github.com/sagernet/gomobile v0.1.8
-	github.com/sagernet/gvisor v0.0.0-20250909151924-850a370d8506
+	github.com/sagernet/gvisor v0.0.0-20250811.0-sing-box-mod.1
 	github.com/sagernet/quic-go v0.52.0-beta.1
-	github.com/sagernet/sing v0.8.0-beta.1
+	github.com/sagernet/sing v0.8.0-beta.2
 	github.com/sagernet/sing-mux v0.3.3
 	github.com/sagernet/sing-quic v0.5.2-0.20250909100920-da23407a63d5
 	github.com/sagernet/sing-shadowsocks v0.2.8
 	github.com/sagernet/sing-shadowsocks2 v0.2.1
 	github.com/sagernet/sing-shadowtls v0.2.1-0.20250503051639-fcd445d33c11
-	github.com/sagernet/sing-tun v0.8.0-beta.8.0.20250911105100-0381a06643bc
+	github.com/sagernet/sing-tun v0.8.0-beta.10
 	github.com/sagernet/sing-vmess v0.2.8-0.20250909125414-3aed155119a1
 	github.com/sagernet/smux v1.5.34-mod.2
-	github.com/sagernet/tailscale v1.86.5-sing-box-1.13-mod.2
+	github.com/sagernet/tailscale v1.86.5-sing-box-1.13-mod.3
 	github.com/sagernet/wireguard-go v0.0.2-beta.1
 	github.com/sagernet/ws v0.0.0-20231204124109-acfe8907c854
 	github.com/spf13/cobra v1.9.1

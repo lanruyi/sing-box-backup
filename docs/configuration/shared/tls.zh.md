@@ -7,11 +7,11 @@ icon: material/new-box
     :material-plus: [kernel_tx](#kernel_tx)
     :material-plus: [kernel_rx](#kernel_rx)
     :material-plus: [curve_preferences](#curve_preferences)
-    :material-plus: [certificate_sha256](#certificate_sha256)
+    :material-plus: [certificate_public_key_sha256](#certificate_public_key_sha256)
     :material-plus: [client_authentication](#client_authentication)
     :material-plus: [client_certificate](#client_certificate)
     :material-plus: [client_certificate_path](#client_certificate_path)
-    :material-plus: [client_certificate_sha256](#client_certificate_sha256)
+    :material-plus: [client_certificate_public_key_sha256](#client_certificate_public_key_sha256)
 
 !!! quote "sing-box 1.12.0 中的更改"
 
@@ -41,7 +41,7 @@ icon: material/new-box
   "client_authentication": "",
   "client_certificate": [],
   "client_certificate_path": [],
-  "client_certificate_sha256": [],
+  "client_certificate_public_key_sha256": [],
   "key": [],
   "key_path": "",
   "kernel_tx": false,
@@ -103,7 +103,7 @@ icon: material/new-box
   "cipher_suites": [],
   "certificate": "",
   "certificate_path": "",
-  "certificate_sha256": [],
+  "certificate_public_key_sha256": [],
   "fragment": false,
   "fragment_fallback_delay": "",
   "record_fragment": false,
@@ -235,13 +235,23 @@ TLS 版本值：
 
 服务器证书链路径，PEM 格式。
 
-#### certificate_sha256
+#### certificate_public_key_sha256
 
 !!! question "自 sing-box 1.13.0 起"
 
 ==仅客户端==
 
-服务器证书链的 SHA-256 哈希列表，base64 格式。
+服务器证书公钥的 SHA-256 哈希列表，base64 格式。
+
+要生成证书公钥的 SHA-256 哈希，请使用以下命令：
+
+```bash
+# 对于证书文件
+openssl x509 -in certificate.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+
+# 对于远程服务器的证书
+echo | openssl s_client -servername example.com -connect example.com:443 2>/dev/null | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+```
 
 #### key
 
@@ -280,7 +290,7 @@ TLS 版本值：
 * `require-and-verify`
 
 如果此选项设置为 `verify-if-given` 或 `require-and-verify`，
-则需要 `client_certificate`、`client_certificate_path` 或 `client_certificate_sha256` 中的一个。
+则需要 `client_certificate`、`client_certificate_path` 或 `client_certificate_public_key_sha256` 中的一个。
 
 #### client_certificate
 
@@ -302,13 +312,23 @@ TLS 版本值：
 
 客户端证书链路径列表，PEM 格式。
 
-#### client_certificate_sha256
+#### client_certificate_public_key_sha256
 
 !!! question "自 sing-box 1.13.0 起"
 
 ==仅服务器==
 
-客户端证书链的 SHA-256 哈希列表，base64 格式。
+客户端证书公钥的 SHA-256 哈希列表，base64 格式。
+
+要生成证书公钥的 SHA-256 哈希，请使用以下命令：
+
+```bash
+# 对于证书文件
+openssl x509 -in certificate.pem -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+
+# 对于远程服务器的证书
+echo | openssl s_client -servername example.com -connect example.com:443 2>/dev/null | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+```
 
 #### kernel_tx
 

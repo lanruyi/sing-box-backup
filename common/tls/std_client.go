@@ -112,13 +112,13 @@ func NewSTDClient(ctx context.Context, logger logger.ContextLogger, serverAddres
 			return err
 		}
 	}
-	if len(options.CertificateSHA256) > 0 {
+	if len(options.CertificatePublicKeySHA256) > 0 {
 		if len(options.Certificate) > 0 || options.CertificatePath != "" {
-			return nil, E.New("certificate_sha256 is conflict with certificate or certificate_path")
+			return nil, E.New("certificate_public_key_sha256 is conflict with certificate or certificate_path")
 		}
 		tlsConfig.InsecureSkipVerify = true
 		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-			return verifyCertificateSHA256(options.CertificateSHA256, rawCerts, tlsConfig.Time)
+			return verifyPublicKeySHA256(options.CertificatePublicKeySHA256, rawCerts, tlsConfig.Time)
 		}
 	}
 	if len(options.ALPN) > 0 {
@@ -197,9 +197,20 @@ func NewSTDClient(ctx context.Context, logger logger.ContextLogger, serverAddres
 	return config, nil
 }
 
-func verifyCertificateSHA256(knownHashValues [][]byte, rawCerts [][]byte, timeFunc func() time.Time) error {
+func verifyPublicKeySHA256(knownHashValues [][]byte, rawCerts [][]byte, timeFunc func() time.Time) error {
 	for i, rawCert := range rawCerts {
-		hash := sha256.Sum256(rawCert)
+		certificate, err := x509.ParseCertificate(rawCert)
+		if err != nil {
+			continue
+		}
+
+		// Extract public key and hash it
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(certificate.PublicKey)
+		if err != nil {
+			continue
+		}
+		hash := sha256.Sum256(pubKeyBytes)
+
 		var matched bool
 		for _, value := range knownHashValues {
 			if bytes.Equal(value, hash[:]) {
@@ -234,5 +245,15 @@ func verifyCertificateSHA256(knownHashValues [][]byte, rawCerts [][]byte, timeFu
 		}
 		return common.Error(certificates[0].Verify(verifyOptions))
 	}
-	return E.New("unrecognized certificate: ", base64.StdEncoding.EncodeToString(common.Ptr(sha256.Sum256(rawCerts[0]))[:]))
+
+	// Generate error message with first certificate's public key hash
+	if len(rawCerts) > 0 {
+		if certificate, err := x509.ParseCertificate(rawCerts[0]); err == nil {
+			if pubKeyBytes, err := x509.MarshalPKIXPublicKey(certificate.PublicKey); err == nil {
+				hash := sha256.Sum256(pubKeyBytes)
+				return E.New("unrecognized public key: ", base64.StdEncoding.EncodeToString(hash[:]))
+			}
+		}
+	}
+	return E.New("unrecognized certificate")
 }

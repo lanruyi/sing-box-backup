@@ -10,6 +10,7 @@ import (
 	"github.com/sagernet/sing-box/common/tls"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
+
 	"golang.org/x/net/http2"
 )
 

@@ -243,11 +243,11 @@ func NewUTLSClient(ctx context.Context, logger logger.ContextLogger, serverAddre
 		clientKey = content
 	}
 	if len(clientCertificate) > 0 && len(clientKey) > 0 {
-		keyPair, err := tls.X509KeyPair(clientCertificate, clientKey)
+		keyPair, err := utls.X509KeyPair(clientCertificate, clientKey)
 		if err != nil {
 			return nil, E.Cause(err, "parse client x509 key pair")
 		}
-		tlsConfig.Certificates = []tls.Certificate{keyPair}
+		tlsConfig.Certificates = []utls.Certificate{keyPair}
 	} else if len(clientCertificate) > 0 || len(clientKey) > 0 {
 		return nil, E.New("client certificate and client key must be provided together")
 	}

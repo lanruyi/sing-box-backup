@@ -289,17 +289,13 @@ Connection output mark used by `auto_redirect`.
 
 !!! quote ""
 
-    Only supported on Linux with nftables (requires `auto_redirect` enabled).
-
-Bypass MPTCP connections in `auto_redirect`.
+    Only supported on Linux with nftables and requires `auto_route` and `auto_redirect` enabled.
 
 MPTCP cannot be transparently proxied due to protocol limitations.
-Commonly used by Apple ecosystem (Apple Music, FaceTime, etc).
 
-By default, MPTCP connections will be rejected to avoid errors.
-When enabled, MPTCP connections will bypass sing-box and connect directly.
+Such traffic is usually created by Apple systems.
 
-`false` is used by default.
+When enabled, MPTCP connections will bypass sing-box and connect directly, otherwise, will be rejected to avoid errors by default.
 
 #### loopback_address
 

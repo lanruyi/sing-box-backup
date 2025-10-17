@@ -288,17 +288,13 @@ tun 接口的 IPv6 前缀。
 
 !!! quote ""
 
-    仅在 Linux 上使用 nftables 时支持（需要启用 `auto_redirect`）。
-
-在 `auto_redirect` 中绕过 MPTCP 连接。
+    仅支持 Linux，且需要 nftables，`auto_route` 和 `auto_redirect` 已启用。 
 
 由于协议限制，MPTCP 无法被透明代理。
-通常由 Apple 生态系统使用（Apple Music、FaceTime 等）。
 
-默认情况下，MPTCP 连接将被拒绝以避免错误。
-启用时，MPTCP 连接将绕过 sing-box 直接连接。
+此类流量通常由 Apple 系统创建。
 
-默认使用 `false`。
+启用时，MPTCP 连接将绕过 sing-box 直接连接，否则，将被拒绝以避免错误。
 
 #### loopback_address
 

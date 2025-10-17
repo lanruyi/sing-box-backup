@@ -2,6 +2,10 @@
 icon: material/new-box
 ---
 
+!!! quote "sing-box 1.13.0 中的更改"
+
+    :material-plus: [exclude_mptcp](#exclude_mptcp)
+
 !!! quote "sing-box 1.12.0 中的更改"
 
     :material-plus: [loopback_address](#loopback_address)
@@ -63,6 +67,7 @@ icon: material/new-box
   "auto_redirect": true,
   "auto_redirect_input_mark": "0x2023",
   "auto_redirect_output_mark": "0x2024",
+  "exclude_mptcp": false,
   "loopback_address": [
     "10.7.0.1"
   ],
@@ -276,6 +281,24 @@ tun 接口的 IPv6 前缀。
 `auto_redirect` 使用的连接输出标记。
 
 默认使用 `0x2024`。
+
+#### exclude_mptcp
+
+!!! question "自 sing-box 1.13.0 起"
+
+!!! quote ""
+
+    仅在 Linux 上使用 nftables 时支持（需要启用 `auto_redirect`）。
+
+在 `auto_redirect` 中绕过 MPTCP 连接。
+
+由于协议限制，MPTCP 无法被透明代理。
+通常由 Apple 生态系统使用（Apple Music、FaceTime 等）。
+
+默认情况下，MPTCP 连接将被拒绝以避免错误。
+启用时，MPTCP 连接将绕过 sing-box 直接连接。
+
+默认使用 `false`。
 
 #### loopback_address
 

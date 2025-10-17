@@ -2,6 +2,10 @@
 icon: material/new-box
 ---
 
+!!! quote "Changes in sing-box 1.13.0"
+
+    :material-plus: [exclude_mptcp](#exclude_mptcp)
+
 !!! quote "Changes in sing-box 1.12.0"
 
     :material-plus: [loopback_address](#loopback_address)
@@ -63,6 +67,7 @@ icon: material/new-box
   "auto_redirect": true,
   "auto_redirect_input_mark": "0x2023",
   "auto_redirect_output_mark": "0x2024",
+  "exclude_mptcp": false,
   "loopback_address": [
     "10.7.0.1"
   ],
@@ -277,6 +282,24 @@ Connection input mark used by `auto_redirect`.
 Connection output mark used by `auto_redirect`.
 
 `0x2024` is used by default.
+
+#### exclude_mptcp
+
+!!! question "Since sing-box 1.13.0"
+
+!!! quote ""
+
+    Only supported on Linux with nftables (requires `auto_redirect` enabled).
+
+Bypass MPTCP connections in `auto_redirect`.
+
+MPTCP cannot be transparently proxied due to protocol limitations.
+Commonly used by Apple ecosystem (Apple Music, FaceTime, etc).
+
+By default, MPTCP connections will be rejected to avoid errors.
+When enabled, MPTCP connections will bypass sing-box and connect directly.
+
+`false` is used by default.
 
 #### loopback_address
 

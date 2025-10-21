@@ -2,6 +2,14 @@
 icon: material/alert-decagram
 ---
 
+#### 1.13.0-alpha.25
+
+* Fixes and improvements
+
+#### 1.12.11
+
+* Fixes and improvements
+
 #### 1.13.0-alpha.24
 
 * Add Claude Code Multiplexer service **1**

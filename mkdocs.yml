@@ -175,6 +175,7 @@ nav:
           - DERP: configuration/service/derp.md
           - Resolved: configuration/service/resolved.md
           - SSM API: configuration/service/ssm-api.md
+          - CCM: configuration/service/ccm.md
 markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets

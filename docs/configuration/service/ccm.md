@@ -19,6 +19,7 @@ It handles OAuth authentication with Claude's API and allows clients to authenti
   ... // Listen Fields
 
   "credential_path": "",
+  "usages_path": "",
   "users": [],
   "headers": {},
   "detour": "",
@@ -41,6 +42,18 @@ If not specified, uses `~/.claude/.credentials.json`.
 On macOS, credentials are read from system keychain first, then fall back to file.
 
 Refreshed tokens are written back to the same location.
+
+#### usages_path
+
+File path for storing aggregated API usage statistics.
+
+If not specified, usage tracking is disabled.
+
+When enabled, the service tracks and saves statistics including request counts, token usage (input, output, cache read, cache creation), and calculated costs in USD based on Claude API pricing.
+
+Statistics are organized by model, context window (200k standard vs 1M premium), and optionally by user (when authentication is enabled).
+
+The file is automatically saved every minute and on service shutdown.
 
 #### users
 

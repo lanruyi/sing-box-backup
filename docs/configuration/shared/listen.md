@@ -2,11 +2,15 @@
 icon: material/new-box
 ---
 
+!!! quote "Changes in sing-box 1.13.0"
+
+    :material-alert: [tcp_keep_alive](#tcp_keep_alive)
+
 !!! quote "Changes in sing-box 1.12.0"
 
-    :material-plus: [netns](#netns)  
-    :material-plus: [bind_interface](#bind_interface)  
-    :material-plus: [routing_mark](#routing_mark)  
+    :material-plus: [netns](#netns)
+    :material-plus: [bind_interface](#bind_interface)
+    :material-plus: [routing_mark](#routing_mark)
     :material-plus: [reuse_addr](#reuse_addr)
 
 !!! quote "Changes in sing-box 1.11.0"
@@ -29,6 +33,8 @@ icon: material/new-box
   "netns": "",
   "tcp_fast_open": false,
   "tcp_multi_path": false,
+  "tcp_keep_alive": "",
+  "tcp_keep_alive_interval": "",
   "udp_fragment": false,
   "udp_timeout": "",
   "detour": "",
@@ -100,6 +106,22 @@ Enable TCP Fast Open.
     Go 1.21 required.
 
 Enable TCP Multi Path.
+
+#### tcp_keep_alive
+
+!!! question "Since sing-box 1.13.0"
+
+    Default value changed from `10m` to `5m`.
+
+TCP keep-alive initial period.
+
+`5m` will be used by default.
+
+#### tcp_keep_alive_interval
+
+TCP keep-alive interval.
+
+`75s` will be used by default.
 
 #### udp_fragment
 

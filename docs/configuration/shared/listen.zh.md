@@ -8,9 +8,9 @@ icon: material/new-box
 
 !!! quote "Changes in sing-box 1.12.0"
 
-    :material-plus: [netns](#netns)
-    :material-plus: [bind_interface](#bind_interface)
-    :material-plus: [routing_mark](#routing_mark)
+    :material-plus: [netns](#netns)  
+    :material-plus: [bind_interface](#bind_interface)  
+    :material-plus: [routing_mark](#routing_mark)  
     :material-plus: [reuse_addr](#reuse_addr)
 
 !!! quote "sing-box 1.11.0 中的更改"

@@ -4,13 +4,13 @@ icon: material/new-box
 
 !!! quote "sing-box 1.13.0 中的更改"
 
-    :material-plus: [tcp_keep_alive](#tcp_keep_alive)
+    :material-plus: [tcp_keep_alive](#tcp_keep_alive)  
     :material-plus: [tcp_keep_alive_interval](#tcp_keep_alive_interval)
 
 !!! quote "sing-box 1.12.0 中的更改"
 
-    :material-plus: [domain_resolver](#domain_resolver)
-    :material-delete-clock: [domain_strategy](#domain_strategy)
+    :material-plus: [domain_resolver](#domain_resolver)  
+    :material-delete-clock: [domain_strategy](#domain_strategy)  
     :material-plus: [netns](#netns)
 
 !!! quote "sing-box 1.11.0 中的更改"

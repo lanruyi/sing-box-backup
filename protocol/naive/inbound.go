@@ -104,7 +104,7 @@ func (n *Inbound) Start(stage adapter.StartStage) error {
 			},
 		}
 		go func() {
-			var listener net.Listener = tcpListener
+			listener := net.Listener(tcpListener)
 			if n.tlsConfig != nil {
 				if len(n.tlsConfig.NextProtos()) == 0 {
 					n.tlsConfig.SetNextProtos([]string{http2.NextProtoTLS, "http/1.1"})

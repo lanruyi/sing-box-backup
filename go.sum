@@ -152,8 +152,8 @@ github.com/sagernet/bbolt v0.0.0-20231014093535-ea5cb2fe9f0a h1:+NkI2670SQpQWvkk
 github.com/sagernet/bbolt v0.0.0-20231014093535-ea5cb2fe9f0a/go.mod h1:63s7jpZqcDAIpj8oI/1v4Izok+npJOHACFCU6+huCkM=
 github.com/sagernet/cors v1.2.1 h1:Cv5Z8y9YSD6Gm+qSpNrL3LO4lD3eQVvbFYJSG7JCMHQ=
 github.com/sagernet/cors v1.2.1/go.mod h1:O64VyOjjhrkLmQIjF4KGRrJO/5dVXFdpEmCW/eISRAI=
-github.com/sagernet/cronet-go v0.0.0-20251212022311-629f90088dc7 h1:Y2y0vbWQFhdgWCyfQpp0penwyJsreXQ7Mj89O+8ECo8=
-github.com/sagernet/cronet-go v0.0.0-20251212022311-629f90088dc7/go.mod h1:DzcRxPQdpy5y2bbabpFXotAzPfY2P4HKZ8rQj3dSClo=
+github.com/sagernet/cronet-go v0.0.1-140.0.7339.123-1 h1:ql2eCQp1sIinoSwNcJW+tBGToRoxm0rsU8uqRJA9Vao=
+github.com/sagernet/cronet-go v0.0.1-140.0.7339.123-1/go.mod h1:DzcRxPQdpy5y2bbabpFXotAzPfY2P4HKZ8rQj3dSClo=
 github.com/sagernet/cronet-go/all v0.0.0-20251212022647-84c3c9e2a88e h1:8EbRGPgjPVd54A42d8kPHkBemndix3E9X4ynKvgrKPI=
 github.com/sagernet/cronet-go/all v0.0.0-20251212022647-84c3c9e2a88e/go.mod h1:LXgFATxmlI7hhzwYYsiu1IhhRFCMykcE/xhehiIeUMo=
 github.com/sagernet/cronet-go/lib/android_386 v0.0.0-20251212022311-629f90088dc7 h1:eRDi6flT6kKRXKQanFJqyEBgvGlGjJ3cM1rC0ClaL9o=

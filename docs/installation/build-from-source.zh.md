@@ -77,7 +77,7 @@ NaiveProxy 出站需要根据目标平台进行特殊的构建配置。
 | Linux         | amd64, arm64           | purego | 无（官方发布版本已包含库文件）                |
 | Linux         | 386, amd64, arm, arm64 | CGO    | Chromium 工具链，运行时需要 glibc >= 2.31 |
 | Linux (musl)  | 386, amd64, arm, arm64 | CGO    | Chromium 工具链                   |
-| Windows       | amd64, 386, arm64      | purego | 无（官方发布版本已包含库文件）                |
+| Windows       | amd64, arm64           | purego | 无（官方发布版本已包含库文件）                |
 | Apple 平台      | *                      | CGO    | Xcode                          |
 | Android       | *                      | CGO    | Android NDK                    |
 

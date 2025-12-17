@@ -35,7 +35,7 @@ icon: material/new-box
     | (default)     | Linux amd64/arm64 | purego build with `libcronet.so` included |
     | `-glibc`      | Linux 386/amd64/arm/arm64 | CGO build dynamically linked with glibc, requires glibc >= 2.31 |
     | `-musl`       | Linux 386/amd64/arm/arm64 | CGO build statically linked with musl, no system requirements |
-    | (default)     | Windows amd64/386/arm64 | purego build with `libcronet.dll` included |
+    | (default)     | Windows amd64/arm64 | purego build with `libcronet.dll` included |
 
     **Runtime Requirements:**
 

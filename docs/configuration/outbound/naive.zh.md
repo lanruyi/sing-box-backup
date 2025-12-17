@@ -35,7 +35,7 @@ icon: material/new-box
     | (默认)      | Linux amd64/arm64      | purego 构建，包含 `libcronet.so`              |
     | `-glibc`  | Linux 386/amd64/arm/arm64 | CGO 构建，动态链接 glibc，要求 glibc >= 2.31       |
     | `-musl`   | Linux 386/amd64/arm/arm64 | CGO 构建，静态链接 musl，无系统要求                   |
-    | (默认)      | Windows amd64/386/arm64 | purego 构建，包含 `libcronet.dll`             |
+    | (默认)      | Windows amd64/arm64 | purego 构建，包含 `libcronet.dll`             |
 
     **运行时要求：**
 

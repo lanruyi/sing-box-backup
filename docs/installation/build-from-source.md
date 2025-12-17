@@ -73,7 +73,7 @@ NaiveProxy outbound requires special build configurations depending on your targ
 | Linux           | amd64, arm64           | purego | None (library included in official releases)      |
 | Linux           | 386, amd64, arm, arm64 | CGO    | Chromium toolchain, glibc >= 2.31 at runtime      |
 | Linux (musl)    | 386, amd64, arm, arm64 | CGO    | Chromium toolchain                                |
-| Windows         | amd64, 386, arm64      | purego | None (library included in official releases)      |
+| Windows         | amd64, arm64           | purego | None (library included in official releases)      |
 | Apple platforms | *                      | CGO    | Xcode                                             |
 | Android         | *                      | CGO    | Android NDK                                       |
 

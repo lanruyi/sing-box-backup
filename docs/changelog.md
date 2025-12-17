@@ -4,10 +4,16 @@ icon: material/alert-decagram
 
 #### 1.13.0-alpha.30
 
-* Add OpenAI Codex Multiplexer service **1**
+* Fix NaiveProxy outbound on Windows **1**
+* Add OpenAI Codex Multiplexer service **2**
 * Fixes and improvements
 
 **1**:
+
+Each Windows release now includes `libcronet.dll`.
+Ensure this file is in the same directory as `sing-box.exe` or in a directory listed in `PATH`.
+
+**2**:
 
 See [OCM](/configuration/service/ocm).
 

@@ -35,7 +35,6 @@ import (
 	"github.com/sagernet/sing-box/protocol/tun"
 	"github.com/sagernet/sing-box/protocol/vless"
 	"github.com/sagernet/sing-box/protocol/vmess"
-	"github.com/sagernet/sing-box/service/memoryleakreporter"
 	"github.com/sagernet/sing-box/service/resolved"
 	"github.com/sagernet/sing-box/service/ssmapi"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -134,7 +133,6 @@ func ServiceRegistry() *service.Registry {
 
 	resolved.RegisterService(registry)
 	ssmapi.RegisterService(registry)
-	memoryleakreporter.RegisterService(registry)
 
 	registerDERPService(registry)
 	registerCCMService(registry)

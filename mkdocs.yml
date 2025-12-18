@@ -178,6 +178,7 @@ nav:
           - SSM API: configuration/service/ssm-api.md
           - CCM: configuration/service/ccm.md
           - OCM: configuration/service/ocm.md
+          - Memory Leak Reporter: configuration/service/memory-leak-reporter.md
 markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets

@@ -18,7 +18,7 @@ See [NaiveProxy outbound](/configuration/outbound/naive/#quic).
 
 NaiveProxy inbound and outbound now supports configurable QUIC congestion control algorithms, including BBR and BBRv2.
 
-See [NaiveProxy inbound](/configuration/inbound/naive/#quic_congestion_control) and See [NaiveProxy outbound](/configuration/outbound/naive/#quic_congestion_control).
+See [NaiveProxy inbound](/configuration/inbound/naive/#quic_congestion_control) and [NaiveProxy outbound](/configuration/outbound/naive/#quic_congestion_control).
 
 #### 1.13.0-alpha.30
 

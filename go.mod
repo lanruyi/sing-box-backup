@@ -30,7 +30,7 @@ require (
 	github.com/sagernet/cronet-go/all v0.0.0-20251222042025-2235d8db9f7f
 	github.com/sagernet/fswatch v0.1.1
 	github.com/sagernet/gomobile v0.1.10
-	github.com/sagernet/gvisor v0.0.0-20241123041152-536d05261cff
+	github.com/sagernet/gvisor v0.0.0-20250811.0-sing-box-mod.1
 	github.com/sagernet/quic-go v0.58.0-sing-box-mod.1
 	github.com/sagernet/sing v0.8.0-beta.8
 	github.com/sagernet/sing-mux v0.3.3
@@ -41,7 +41,7 @@ require (
 	github.com/sagernet/sing-tun v0.8.0-beta.11.0.20251201004738-e9e3fbf0c15e
 	github.com/sagernet/sing-vmess v0.2.8-0.20250909125414-3aed155119a1
 	github.com/sagernet/smux v1.5.34-mod.2
-	github.com/sagernet/tailscale v1.92.4-sing-box-1.13-mod.1
+	github.com/sagernet/tailscale v1.92.4-sing-box-1.13-mod.3
 	github.com/sagernet/wireguard-go v0.0.2-beta.1.0.20250917110311-16510ac47288
 	github.com/sagernet/ws v0.0.0-20231204124109-acfe8907c854
 	github.com/spf13/cobra v1.10.2

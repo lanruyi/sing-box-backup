@@ -295,14 +295,14 @@ func (t *Endpoint) Start(stage adapter.StartStage) error {
 			tunName = tun.CalculateInterfaceName("tailscale")
 		}
 		tunOptions := tun.Options{
-			Name:                  tunName,
-			MTU:                   mtu,
-			GSO:                   true,
-			InterfaceScope:        true,
-			ExternalConfiguration: true,
-			InterfaceMonitor:      t.network.InterfaceMonitor(),
-			InterfaceFinder:       t.network.InterfaceFinder(),
-			Logger:                t.logger,
+			Name:                      tunName,
+			MTU:                       mtu,
+			GSO:                       true,
+			InterfaceScope:            true,
+			InterfaceMonitor:          t.network.InterfaceMonitor(),
+			InterfaceFinder:           t.network.InterfaceFinder(),
+			Logger:                    t.logger,
+			EXP_ExternalConfiguration: true,
 		}
 		systemTun, err := tun.New(tunOptions)
 		if err != nil {

@@ -2,6 +2,14 @@
 icon: material/alert-decagram
 ---
 
+#### 1.13.0-beta.5
+
+* Fixes and improvements
+
+#### 1.12.16
+
+* Fixes and improvements
+
 #### 1.13.0-beta.4
 
 * Apple/Android: Add support for sharing configurations via [QRS](https://github.com/qifi-dev/qrs)

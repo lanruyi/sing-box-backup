@@ -240,6 +240,9 @@ lib_android_debug:
 lib_apple:
 	go run ./cmd/internal/build_libbox -target apple
 
+lib_windows:
+	go run ./cmd/internal/build_libbox -target windows
+
 lib_ios:
 	go run ./cmd/internal/build_libbox -target apple -platform ios -debug
 
@@ -248,8 +251,8 @@ lib:
 	go run ./cmd/internal/build_libbox -target ios
 
 lib_install:
-	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.11
-	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.11
+	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12-0.20260111141336-2bce4d211c59
+	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12-0.20260111141336-2bce4d211c59
 
 docs:
 	venv/bin/mkdocs serve

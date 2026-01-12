@@ -29,7 +29,7 @@ require (
 	github.com/sagernet/cronet-go v0.0.0-20251231120443-1d2d7341cbd8
 	github.com/sagernet/cronet-go/all v0.0.0-20251231120443-1d2d7341cbd8
 	github.com/sagernet/fswatch v0.1.1
-	github.com/sagernet/gomobile v0.1.12-0.20260111141336-2bce4d211c59
+	github.com/sagernet/gomobile v0.1.11
 	github.com/sagernet/gvisor v0.0.0-20250811.0-sing-box-mod.1
 	github.com/sagernet/quic-go v0.59.0-sing-box-mod.2
 	github.com/sagernet/sing v0.8.0-beta.10

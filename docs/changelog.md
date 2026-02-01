@@ -4,6 +4,10 @@ icon: material/alert-decagram
 
 #### 1.13.0-rc.1
 
+* Fixes and improvements
+
+Important changes since 1.12:
+
 * Add NaiveProxy outbound **1**
 * Add pre-match support for `auto_redirect` **2**
 * Improve `auto_redirect` **3**

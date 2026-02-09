@@ -243,6 +243,9 @@ lib_android_new:
 lib_apple_new:
 	go run ./cmd/internal/build_libbox_newffi -target apple
 
+lib_install:
+	go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.11
+	go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.11
 
 docs:
 	venv/bin/mkdocs serve

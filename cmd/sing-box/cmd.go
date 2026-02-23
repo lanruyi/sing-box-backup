@@ -23,7 +23,6 @@ var (
 	workingDir        string
 	disableColor      bool
 )
-
 var mainCommand = &cobra.Command{
 	Use:              "sing-box",
 	PersistentPreRun: preRun,

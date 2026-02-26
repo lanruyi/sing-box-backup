@@ -262,7 +262,9 @@ func (m *ConnectionManager) connectionCopy(ctx context.Context, source net.Conn,
 		destination.Close()
 	}
 	if done.Swap(true) {
-		onClose(err)
+		if onClose != nil {
+			onClose(err)
+		}
 		common.Close(source, destination)
 	}
 	if !direction {
@@ -323,7 +325,9 @@ func (m *ConnectionManager) kickWriteHandshake(ctx context.Context, source net.C
 		return false
 	}
 	if !done.Swap(true) {
-		onClose(err)
+		if onClose != nil {
+			onClose(err)
+		}
 	}
 	common.Close(source, destination)
 	if !direction {
@@ -354,7 +358,9 @@ func (m *ConnectionManager) packetConnectionCopy(ctx context.Context, source N.P
 		}
 	}
 	if !done.Swap(true) {
-		onClose(err)
+		if onClose != nil {
+			onClose(err)
+		}
 	}
 	common.Close(source, destination)
 }

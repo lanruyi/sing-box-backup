@@ -188,6 +188,8 @@ func (m *ConnectionManager) NewPacketConnection(ctx context.Context, this N.Dial
 	} else {
 		if len(metadata.DestinationAddresses) > 0 {
 			remotePacketConn, destinationAddress, err = dialer.ListenSerialNetworkPacket(ctx, this, metadata.Destination, metadata.DestinationAddresses, metadata.NetworkStrategy, metadata.NetworkType, metadata.FallbackNetworkType, metadata.FallbackDelay)
+		} else if packetDialer, withDestination := this.(dialer.PacketDialerWithDestination); withDestination {
+			remotePacketConn, destinationAddress, err = packetDialer.ListenPacketWithDestination(ctx, metadata.Destination)
 		} else {
 			remotePacketConn, err = this.ListenPacket(ctx, metadata.Destination)
 		}

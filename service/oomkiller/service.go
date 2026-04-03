@@ -58,15 +58,15 @@ var (
 
 type Service struct {
 	boxService.Adapter
-	ctx              context.Context
-	logger           log.ContextLogger
-	router           adapter.Router
-	memoryLimit      uint64
-	hasTimerMode     bool
-	useAvailable     bool
-	timerConfig      timerConfig
-	adaptiveTimer    *adaptiveTimer
-	criticalReported atomic.Bool
+	ctx            context.Context
+	logger         log.ContextLogger
+	router         adapter.Router
+	memoryLimit    uint64
+	hasTimerMode   bool
+	useAvailable   bool
+	timerConfig    timerConfig
+	adaptiveTimer  *adaptiveTimer
+	lastReportTime atomic.Int64
 }
 
 func NewService(ctx context.Context, logger log.ContextLogger, tag string, options option.OOMKillerServiceOptions) (adapter.Service, error) {
@@ -99,7 +99,10 @@ func (s *Service) Start(stage adapter.StartStage) error {
 	}
 
 	if s.hasTimerMode {
-		s.adaptiveTimer = newAdaptiveTimer(s.logger, s.router, s.timerConfig, nil, nil)
+		s.adaptiveTimer = newAdaptiveTimer(s.logger, s.router, s.timerConfig,
+			func(usage uint64) { s.writeOOMReport(usage) },
+			nil,
+		)
 		if s.memoryLimit > 0 {
 			s.logger.Info("started memory monitor with limit: ", s.memoryLimit/(1024*1024), " MiB")
 		} else {
@@ -139,22 +142,6 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) writeOOMReport(memoryUsage uint64) {
-	if !s.criticalReported.CompareAndSwap(false, true) {
-		return
-	}
-	reporter := service.FromContext[OOMReporter](s.ctx)
-	if reporter == nil {
-		return
-	}
-	err := reporter.WriteReport(memoryUsage)
-	if err != nil {
-		s.logger.Warn("failed to write OOM report: ", err)
-	} else {
-		s.logger.Info("OOM report saved")
-	}
-}
-
 //export goMemoryPressureCallback
 func goMemoryPressureCallback(status C.ulong) {
 	globalAccess.Lock()
@@ -183,7 +170,6 @@ func goMemoryPressureCallback(status C.ulong) {
 		if s.hasTimerMode {
 			if isCritical {
 				s.logger.Warn("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
-				s.writeOOMReport(usage)
 				if s.adaptiveTimer != nil {
 					s.adaptiveTimer.startNow()
 				}
@@ -191,7 +177,6 @@ func goMemoryPressureCallback(status C.ulong) {
 				s.logger.Warn("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
 			} else {
 				s.logger.Debug("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
-				s.criticalReported.Store(false)
 				if s.adaptiveTimer != nil {
 					s.adaptiveTimer.stop()
 				}
@@ -206,7 +191,6 @@ func goMemoryPressureCallback(status C.ulong) {
 				s.logger.Warn("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
 			} else {
 				s.logger.Debug("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
-				s.criticalReported.Store(false)
 			}
 		}
 	}

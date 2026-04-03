@@ -719,7 +719,7 @@ func (s *StartedService) TriggerOOMReport(ctx context.Context, _ *emptypb.Empty)
 	if instance == nil {
 		return nil, status.Error(codes.FailedPrecondition, "service not started")
 	}
-	reporter := service.FromContext[oomkiller.OOMReporter](instance.Context())
+	reporter := service.FromContext[oomkiller.OOMReporter](instance.ctx)
 	if reporter == nil {
 		return nil, status.Error(codes.Unavailable, "OOM reporter not available")
 	}

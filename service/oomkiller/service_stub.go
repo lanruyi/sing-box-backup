@@ -22,15 +22,15 @@ func RegisterService(registry *boxService.Registry) {
 
 type Service struct {
 	boxService.Adapter
-	ctx              context.Context
-	logger           log.ContextLogger
-	router           adapter.Router
-	adaptiveTimer    *adaptiveTimer
-	timerConfig      timerConfig
-	hasTimerMode     bool
-	useAvailable     bool
-	memoryLimit      uint64
-	criticalReported atomic.Bool
+	ctx            context.Context
+	logger         log.ContextLogger
+	router         adapter.Router
+	memoryLimit    uint64
+	hasTimerMode   bool
+	useAvailable   bool
+	timerConfig    timerConfig
+	adaptiveTimer  *adaptiveTimer
+	lastReportTime atomic.Int64
 }
 
 func NewService(ctx context.Context, logger log.ContextLogger, tag string, options option.OOMKillerServiceOptions) (adapter.Service, error) {
@@ -68,8 +68,8 @@ func (s *Service) Start(stage adapter.StartStage) error {
 		return E.New("memory pressure monitoring is not available on this platform without memory_limit")
 	}
 	s.adaptiveTimer = newAdaptiveTimer(s.logger, s.router, s.timerConfig,
-		func() { s.writeOOMReport(memory.Total()) },
-		func() { s.criticalReported.Store(false) },
+		func(usage uint64) { s.writeOOMReport(usage) },
+		nil,
 	)
 	s.adaptiveTimer.start(0)
 	if s.useAvailable {
@@ -78,22 +78,6 @@ func (s *Service) Start(stage adapter.StartStage) error {
 		s.logger.Info("started memory monitor with limit: ", s.memoryLimit/(1024*1024), " MiB")
 	}
 	return nil
-}
-
-func (s *Service) writeOOMReport(memoryUsage uint64) {
-	if !s.criticalReported.CompareAndSwap(false, true) {
-		return
-	}
-	reporter := service.FromContext[OOMReporter](s.ctx)
-	if reporter == nil {
-		return
-	}
-	err := reporter.WriteReport(memoryUsage)
-	if err != nil {
-		s.logger.Warn("failed to write OOM report: ", err)
-	} else {
-		s.logger.Info("OOM report saved")
-	}
 }
 
 func (s *Service) Close() error {

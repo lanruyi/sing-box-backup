@@ -7,6 +7,7 @@ import (
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/log"
+	"github.com/sagernet/sing/common/byteformats"
 	"github.com/sagernet/sing/common/memory"
 )
 
@@ -26,6 +27,7 @@ type adaptiveTimer struct {
 	maxInterval       time.Duration
 	checksBeforeLimit int
 	useAvailable      bool
+	killerDisabled    bool
 	onTriggered       func(uint64)
 	onRecovered       func()
 
@@ -43,6 +45,7 @@ type timerConfig struct {
 	maxInterval       time.Duration
 	checksBeforeLimit int
 	useAvailable      bool
+	killerDisabled    bool
 }
 
 func newAdaptiveTimer(logger log.ContextLogger, router adapter.Router, config timerConfig, onTriggered func(uint64), onRecovered func()) *adaptiveTimer {
@@ -55,6 +58,7 @@ func newAdaptiveTimer(logger log.ContextLogger, router adapter.Router, config ti
 		maxInterval:       config.maxInterval,
 		checksBeforeLimit: config.checksBeforeLimit,
 		useAvailable:      config.useAvailable,
+		killerDisabled:    config.killerDisabled,
 		onTriggered:       onTriggered,
 		onRecovered:       onRecovered,
 	}
@@ -141,8 +145,12 @@ func (t *adaptiveTimer) poll() {
 				t.onTriggered(usage)
 			}
 		}
-		t.logger.Error("memory threshold reached, usage: ", usage/(1024*1024), " MiB, resetting network")
-		t.router.ResetNetwork()
+		if t.killerDisabled {
+			t.logger.Warn("memory threshold reached (report only), usage: ", byteformats.FormatMemoryBytes(usage))
+		} else {
+			t.logger.Error("memory threshold reached, usage: ", usage/(1024*1024), " MiB, resetting network")
+			t.router.ResetNetwork()
+		}
 		runtimeDebug.FreeOSMemory()
 	} else if t.previouslyTriggered {
 		t.previouslyTriggered = false

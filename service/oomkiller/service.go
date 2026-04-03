@@ -43,6 +43,7 @@ import (
 	boxConstant "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common/byteformats"
 	"github.com/sagernet/sing/common/memory"
 	"github.com/sagernet/sing/service"
 )
@@ -64,6 +65,7 @@ type Service struct {
 	memoryLimit    uint64
 	hasTimerMode   bool
 	useAvailable   bool
+	killerDisabled bool
 	timerConfig    timerConfig
 	adaptiveTimer  *adaptiveTimer
 	lastReportTime atomic.Int64
@@ -71,20 +73,24 @@ type Service struct {
 
 func NewService(ctx context.Context, logger log.ContextLogger, tag string, options option.OOMKillerServiceOptions) (adapter.Service, error) {
 	s := &Service{
-		Adapter: boxService.NewAdapter(boxConstant.TypeOOMKiller, tag),
-		ctx:     ctx,
-		logger:  logger,
-		router:  service.FromContext[adapter.Router](ctx),
+		Adapter:        boxService.NewAdapter(boxConstant.TypeOOMKiller, tag),
+		ctx:            ctx,
+		logger:         logger,
+		router:         service.FromContext[adapter.Router](ctx),
+		killerDisabled: options.KillerDisabled,
 	}
 
-	if options.MemoryLimit != nil {
+	if options.MemoryLimitOverride > 0 {
+		s.memoryLimit = options.MemoryLimitOverride
+		s.hasTimerMode = true
+	} else if options.MemoryLimit != nil {
 		s.memoryLimit = options.MemoryLimit.Value()
 		if s.memoryLimit > 0 {
 			s.hasTimerMode = true
 		}
 	}
 
-	config, err := buildTimerConfig(options, s.memoryLimit, s.useAvailable)
+	config, err := buildTimerConfig(options, s.memoryLimit, s.useAvailable, s.killerDisabled)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +110,7 @@ func (s *Service) Start(stage adapter.StartStage) error {
 			nil,
 		)
 		if s.memoryLimit > 0 {
-			s.logger.Info("started memory monitor with limit: ", s.memoryLimit/(1024*1024), " MiB")
+			s.logger.Info("started memory monitor with limit: ", byteformats.FormatMemoryBytes(s.memoryLimit))
 		} else {
 			s.logger.Info("started memory monitor with available memory detection")
 		}
@@ -169,14 +175,14 @@ func goMemoryPressureCallback(status C.ulong) {
 		usage := memory.Total()
 		if s.hasTimerMode {
 			if isCritical {
-				s.logger.Warn("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
+				s.logger.Warn("memory pressure: ", level, ", usage: ", byteformats.FormatMemoryBytes(usage))
 				if s.adaptiveTimer != nil {
 					s.adaptiveTimer.startNow()
 				}
 			} else if isWarning {
-				s.logger.Warn("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
+				s.logger.Warn("memory pressure: ", level, ", usage: ", byteformats.FormatMemoryBytes(usage))
 			} else {
-				s.logger.Debug("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
+				s.logger.Debug("memory pressure: ", level, ", usage: ", byteformats.FormatMemoryBytes(usage))
 				if s.adaptiveTimer != nil {
 					s.adaptiveTimer.stop()
 				}
@@ -184,13 +190,17 @@ func goMemoryPressureCallback(status C.ulong) {
 		} else {
 			if isCritical {
 				s.writeOOMReport(usage)
-				s.logger.Error("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB, resetting network")
-				s.router.ResetNetwork()
+				if s.killerDisabled {
+					s.logger.Warn("memory pressure: ", level, " (report only), usage: ", byteformats.FormatMemoryBytes(usage))
+				} else {
+					s.logger.Error("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB, resetting network")
+					s.router.ResetNetwork()
+				}
 				freeOSMemory = true
 			} else if isWarning {
-				s.logger.Warn("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
+				s.logger.Warn("memory pressure: ", level, ", usage: ", byteformats.FormatMemoryBytes(usage))
 			} else {
-				s.logger.Debug("memory pressure: ", level, ", usage: ", usage/(1024*1024), " MiB")
+				s.logger.Debug("memory pressure: ", level, ", usage: ", byteformats.FormatMemoryBytes(usage))
 			}
 		}
 	}

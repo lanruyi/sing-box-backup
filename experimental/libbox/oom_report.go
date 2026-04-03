@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/service/oomkiller"
+	"github.com/sagernet/sing/common/byteformats"
 	"github.com/sagernet/sing/common/memory"
 )
 
@@ -30,8 +31,8 @@ var oomReportProfiles = []string{
 type oomReportMetadata struct {
 	reportMetadata
 	RecordedAt      string `json:"recordedAt"`
-	MemoryUsage     uint64 `json:"memoryUsage"`
-	AvailableMemory uint64 `json:"availableMemory,omitempty"`
+	MemoryUsage     string `json:"memoryUsage"`
+	AvailableMemory string `json:"availableMemory,omitempty"`
 }
 
 type oomReporter struct{}
@@ -60,10 +61,13 @@ func (r *oomReporter) WriteReport(memoryUsage uint64) error {
 
 	writeReportFile(destPath, "cmdline", []byte(strings.Join(os.Args, "\000")))
 	metadata := oomReportMetadata{
-		reportMetadata:  baseReportMetadata(),
-		RecordedAt:      now.Format(time.RFC3339),
-		MemoryUsage:     memoryUsage,
-		AvailableMemory: memory.Available(),
+		reportMetadata: baseReportMetadata(),
+		RecordedAt:     now.Format(time.RFC3339),
+		MemoryUsage:    byteformats.FormatMemoryBytes(memoryUsage),
+	}
+	availableMemory := memory.Available()
+	if availableMemory > 0 {
+		metadata.AvailableMemory = byteformats.FormatMemoryBytes(availableMemory)
 	}
 	writeReportMetadata(destPath, metadata)
 	copyConfigSnapshot(destPath)

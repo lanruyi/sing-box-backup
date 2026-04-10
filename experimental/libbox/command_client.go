@@ -14,8 +14,10 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -626,37 +628,7 @@ func (c *CommandClient) SetGroupExpand(groupTag string, isExpand bool) error {
 	return err
 }
 
-func (c *CommandClient) ListOutbounds() (OutboundGroupItemIterator, error) {
-	return callWithResult(c, func(client daemon.StartedServiceClient) (OutboundGroupItemIterator, error) {
-		list, err := client.ListOutbounds(context.Background(), &emptypb.Empty{})
-		if err != nil {
-			return nil, err
-		}
-		return outboundGroupItemListFromGRPC(list), nil
-	})
-}
-
-func (c *CommandClient) StartNetworkQualityTest(configURL string, outboundTag string, handler NetworkQualityTestHandler) error {
-	return c.StartNetworkQualityTestWithSerialAndRuntime(
-		configURL,
-		outboundTag,
-		false,
-		NetworkQualityDefaultMaxRuntimeSeconds,
-		handler,
-	)
-}
-
-func (c *CommandClient) StartNetworkQualityTestWithSerial(configURL string, outboundTag string, serial bool, handler NetworkQualityTestHandler) error {
-	return c.StartNetworkQualityTestWithSerialAndRuntime(
-		configURL,
-		outboundTag,
-		serial,
-		NetworkQualityDefaultMaxRuntimeSeconds,
-		handler,
-	)
-}
-
-func (c *CommandClient) StartNetworkQualityTestWithSerialAndRuntime(configURL string, outboundTag string, serial bool, maxRuntimeSeconds int32, handler NetworkQualityTestHandler) error {
+func (c *CommandClient) StartNetworkQualityTest(configURL string, outboundTag string, serial bool, maxRuntimeSeconds int32, http3 bool, handler NetworkQualityTestHandler) error {
 	client, err := c.getClientForCall()
 	if err != nil {
 		return err
@@ -669,6 +641,7 @@ func (c *CommandClient) StartNetworkQualityTestWithSerialAndRuntime(configURL st
 		OutboundTag:       outboundTag,
 		Serial:            serial,
 		MaxRuntimeSeconds: maxRuntimeSeconds,
+		Http3:             http3,
 	})
 	if err != nil {
 		return err
@@ -698,5 +671,94 @@ func (c *CommandClient) StartNetworkQualityTestWithSerialAndRuntime(configURL st
 			return nil
 		}
 		handler.OnProgress(networkQualityProgressFromGRPC(event))
+	}
+}
+
+func (c *CommandClient) StartSTUNTest(server string, outboundTag string, handler STUNTestHandler) error {
+	client, err := c.getClientForCall()
+	if err != nil {
+		return err
+	}
+	if c.standalone {
+		defer c.closeConnection()
+	}
+	stream, err := client.StartSTUNTest(context.Background(), &daemon.STUNTestRequest{
+		Server:      server,
+		OutboundTag: outboundTag,
+	})
+	if err != nil {
+		return err
+	}
+	for {
+		event, recvErr := stream.Recv()
+		if recvErr != nil {
+			handler.OnError(recvErr.Error())
+			return recvErr
+		}
+		if event.IsFinal {
+			if event.Error != "" {
+				handler.OnError(event.Error)
+			} else {
+				handler.OnResult(&STUNTestResult{
+					ExternalAddr:     event.ExternalAddr,
+					LatencyMs:        event.LatencyMs,
+					NATMapping:       event.NatMapping,
+					NATFiltering:     event.NatFiltering,
+					NATTypeSupported: event.NatTypeSupported,
+				})
+			}
+			return nil
+		}
+		handler.OnProgress(stunTestProgressFromGRPC(event))
+	}
+}
+
+func (c *CommandClient) SubscribeTailscaleStatus(handler TailscaleStatusHandler) error {
+	client, err := c.getClientForCall()
+	if err != nil {
+		return err
+	}
+	if c.standalone {
+		defer c.closeConnection()
+	}
+	stream, err := client.SubscribeTailscaleStatus(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return err
+	}
+	for {
+		event, recvErr := stream.Recv()
+		if recvErr != nil {
+			if status.Code(recvErr) == codes.NotFound {
+				return nil
+			}
+			handler.OnError(recvErr.Error())
+			return recvErr
+		}
+		handler.OnStatusUpdate(tailscaleStatusUpdateFromGRPC(event))
+	}
+}
+
+func (c *CommandClient) StartTailscalePing(endpointTag string, peerIP string, handler TailscalePingHandler) error {
+	client, err := c.getClientForCall()
+	if err != nil {
+		return err
+	}
+	if c.standalone {
+		defer c.closeConnection()
+	}
+	stream, err := client.StartTailscalePing(context.Background(), &daemon.TailscalePingRequest{
+		EndpointTag: endpointTag,
+		PeerIP:      peerIP,
+	})
+	if err != nil {
+		return err
+	}
+	for {
+		event, recvErr := stream.Recv()
+		if recvErr != nil {
+			handler.OnError(recvErr.Error())
+			return recvErr
+		}
+		handler.OnPingResult(tailscalePingResultFromGRPC(event))
 	}
 }

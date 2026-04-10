@@ -103,4 +103,3 @@ func convertTailscalePeer(peer *ipnstate.PeerStatus) *adapter.TailscalePeer {
 		KeyExpiry:      keyExpiry,
 	}
 }
-

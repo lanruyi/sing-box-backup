@@ -12,7 +12,6 @@ import (
 	"github.com/sagernet/tailscale/tailcfg"
 )
 
-
 func (t *Endpoint) StartTailscalePing(ctx context.Context, peerIP string, fn func(*adapter.TailscalePingResult)) error {
 	ip, err := netip.ParseAddr(peerIP)
 	if err != nil {

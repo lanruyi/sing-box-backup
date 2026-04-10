@@ -47,4 +47,3 @@ type TailscalePeer struct {
 	UserID         int64
 	KeyExpiry      int64
 }
-

@@ -52,7 +52,7 @@ import (
 	mDNS "github.com/miekg/dns"
 )
 
-func resolvSearch(name string, class, qtype int, timeoutSeconds int) ([]byte, error) {
+func resolvSearch(name string, class, qtype int, timeoutSeconds int) (*mDNS.Msg, error) {
 	state := C.cgo_res_init()
 	if state == nil {
 		return nil, E.New("res_ninit failed")
@@ -74,33 +74,39 @@ func resolvSearch(name string, class, qtype int, timeoutSeconds int) ([]byte, er
 				bufSize = int(n)
 				continue
 			}
-			return answer[:int(n)], nil
-		}
-		var msg mDNS.Msg
-		_ = msg.Unpack(answer[:bufSize])
-		if msg.Truncated && bufSize < 65535 {
-			bufSize *= 2
-			if bufSize > 65535 {
-				bufSize = 65535
+			var response mDNS.Msg
+			err := response.Unpack(answer[:int(n)])
+			if err != nil {
+				return nil, E.Cause(err, "unpack res_nsearch response")
 			}
-			continue
+			return &response, nil
+		}
+		var response mDNS.Msg
+		_ = response.Unpack(answer[:bufSize])
+		if response.Response {
+			if response.Truncated && bufSize < 65535 {
+				bufSize *= 2
+				if bufSize > 65535 {
+					bufSize = 65535
+				}
+				continue
+			}
+			return &response, nil
 		}
 		switch hErrno {
 		case C.HOST_NOT_FOUND:
 			return nil, dns.RcodeNameError
 		case C.TRY_AGAIN:
-			return nil, dns.RcodeServerFailure
+			return nil, dns.RcodeNameError
 		case C.NO_RECOVERY:
 			return nil, dns.RcodeServerFailure
 		case C.NO_DATA:
-			return nil, errNoData
+			return nil, dns.RcodeSuccess
 		default:
 			return nil, E.New("res_nsearch: unknown error ", int(hErrno), " for ", name)
 		}
 	}
 }
-
-var errNoData = E.New("res_nsearch: no data")
 
 func (t *Transport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	question := message.Question[0]
@@ -130,35 +136,27 @@ func (t *Transport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg,
 		timeoutSeconds = seconds
 	}
 	type resolvResult struct {
-		wireResponse []byte
-		err          error
+		response *mDNS.Msg
+		err      error
 	}
-	ch := make(chan resolvResult, 1)
+	resultCh := make(chan resolvResult, 1)
 	go func() {
-		wireResponse, err := resolvSearch(name, int(question.Qclass), int(question.Qtype), timeoutSeconds)
-		ch <- resolvResult{wireResponse, err}
+		response, err := resolvSearch(name, int(question.Qclass), int(question.Qtype), timeoutSeconds)
+		resultCh <- resolvResult{response, err}
 	}()
 	var result resolvResult
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case result = <-ch:
+	case result = <-resultCh:
 	}
 	if result.err != nil {
-		if result.err == errNoData {
-			return dns.FixedResponseStatus(message, mDNS.RcodeSuccess), nil
-		}
 		var rcodeError dns.RcodeError
 		if errors.As(result.err, &rcodeError) {
 			return dns.FixedResponseStatus(message, int(rcodeError)), nil
 		}
 		return nil, result.err
 	}
-	var response mDNS.Msg
-	err := response.Unpack(result.wireResponse)
-	if err != nil {
-		return nil, E.Cause(err, "unpack res_nsearch response")
-	}
-	response.Id = message.Id
-	return &response, nil
+	result.response.Id = message.Id
+	return result.response, nil
 }

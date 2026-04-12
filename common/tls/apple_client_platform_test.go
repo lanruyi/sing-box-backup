@@ -1,4 +1,4 @@
-//go:build darwin && cgo && with_apple_private_api
+//go:build darwin && cgo
 
 package tls
 

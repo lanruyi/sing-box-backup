@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/tcpspoof"
 	"github.com/sagernet/sing-box/common/tlsfragment"
+	"github.com/sagernet/sing-box/common/tlsspoof"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -33,7 +33,7 @@ type STDClientConfig struct {
 	fragmentFallbackDelay time.Duration
 	recordFragment        bool
 	spoof                 string
-	spoofMethod           tcpspoof.Method
+	spoofMethod           tlsspoof.Method
 }
 
 func (c *STDClientConfig) ServerName() string {
@@ -75,10 +75,10 @@ func (c *STDClientConfig) STDConfig() (*STDConfig, error) {
 }
 
 func (c *STDClientConfig) Client(conn net.Conn) (Conn, error) {
-	var spoofer tcpspoof.Spoofer
+	var spoofer tlsspoof.Spoofer
 	if c.spoof != "" {
 		var err error
-		spoofer, err = tcpspoof.NewSpoofer(conn, c.spoofMethod)
+		spoofer, err = tlsspoof.NewSpoofer(conn, c.spoofMethod)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func (c *STDClientConfig) Client(conn net.Conn) (Conn, error) {
 		conn = tf.NewConn(conn, c.ctx, c.fragment, c.recordFragment, c.fragmentFallbackDelay)
 	}
 	if spoofer != nil {
-		conn = tcpspoof.NewConn(conn, spoofer, c.spoof)
+		conn = tlsspoof.NewConn(conn, spoofer, c.spoof)
 	}
 	return tls.Client(conn, c.config), nil
 }
@@ -234,13 +234,13 @@ func newSTDClient(ctx context.Context, logger logger.ContextLogger, serverAddres
 	} else {
 		handshakeTimeout = C.TCPTimeout
 	}
-	if options.Spoof != "" && !tcpspoof.PlatformSupported {
+	if options.Spoof != "" && !tlsspoof.PlatformSupported {
 		return nil, E.New("`spoof` is not supported on this platform")
 	}
 	if options.Spoof == "" && options.SpoofMethod != "" {
 		return nil, E.New("`spoof_method` requires `spoof`")
 	}
-	spoofMethod, err := tcpspoof.ParseMethod(options.SpoofMethod)
+	spoofMethod, err := tlsspoof.ParseMethod(options.SpoofMethod)
 	if err != nil {
 		return nil, err
 	}

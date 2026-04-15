@@ -5,7 +5,6 @@ package windivert
 import (
 	"errors"
 	"net/netip"
-	"os"
 	"testing"
 	"time"
 
@@ -13,22 +12,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Integration tests install the kernel driver via SCM, which requires
-// Administrator. Gated by env to avoid surprising contributors who run
-// the package test target without elevation.
-func requireIntegration(t *testing.T) {
-	t.Helper()
-	if os.Getenv("WINDIVERT_INTEGRATION") != "1" {
-		t.Skip("set WINDIVERT_INTEGRATION=1 to run")
-	}
-}
-
-func openOrSkipOnAccessDenied(t *testing.T, filter *Filter, flags Flag) *Handle {
+func openHandle(t *testing.T, filter *Filter, flags Flag) *Handle {
 	t.Helper()
 	h, err := Open(filter, LayerNetwork, 0, flags)
-	if err != nil && errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-		t.Skipf("requires Administrator: %v", err)
-	}
 	require.NoError(t, err)
 	return h
 }
@@ -37,15 +23,13 @@ func openOrSkipOnAccessDenied(t *testing.T, filter *Filter, flags Flag) *Handle 
 // receive filter, so it exercises the full driver-install path without
 // diverting any live traffic on the host.
 func TestIntegrationOpenSendOnly(t *testing.T) {
-	requireIntegration(t)
-	h := openOrSkipOnAccessDenied(t, nil, FlagSendOnly)
+	h := openHandle(t, nil, FlagSendOnly)
 	require.NoError(t, h.Close())
 }
 
 // Close is idempotent per the doc contract.
 func TestIntegrationCloseTwice(t *testing.T) {
-	requireIntegration(t)
-	h := openOrSkipOnAccessDenied(t, nil, FlagSendOnly)
+	h := openHandle(t, nil, FlagSendOnly)
 	require.NoError(t, h.Close())
 	require.NoError(t, h.Close())
 }
@@ -53,7 +37,6 @@ func TestIntegrationCloseTwice(t *testing.T) {
 // Recv must unblock when the handle is closed concurrently. Without this,
 // the spoofer's run goroutine could deadlock on shutdown.
 func TestIntegrationRecvAbortsOnClose(t *testing.T) {
-	requireIntegration(t)
 	// A filter no live traffic will match, so Recv blocks indefinitely
 	// until Close aborts the overlapped I/O.
 	filter, err := OutboundTCP(
@@ -61,7 +44,7 @@ func TestIntegrationRecvAbortsOnClose(t *testing.T) {
 		netip.MustParseAddrPort("10.255.255.253:2"),
 	)
 	require.NoError(t, err)
-	h := openOrSkipOnAccessDenied(t, filter, 0)
+	h := openHandle(t, filter, 0)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -87,7 +70,6 @@ func TestIntegrationRecvAbortsOnClose(t *testing.T) {
 // Two concurrent Open calls must both succeed: the first wins the driver
 // install race, the second reuses the already-running service.
 func TestIntegrationConcurrentOpen(t *testing.T) {
-	requireIntegration(t)
 	errCh := make(chan error, 2)
 	handles := make(chan *Handle, 2)
 	for i := 0; i < 2; i++ {
@@ -100,9 +82,6 @@ func TestIntegrationConcurrentOpen(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		err := <-errCh
 		h := <-handles
-		if err != nil && errors.Is(err, windows.ERROR_ACCESS_DENIED) {
-			t.Skip("requires Administrator")
-		}
 		require.NoError(t, err)
 		require.NoError(t, h.Close())
 	}

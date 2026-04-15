@@ -7,7 +7,7 @@ package tls
 #cgo LDFLAGS: -framework Foundation -framework Network -framework Security
 
 #include <stdlib.h>
-#include "apple_client_platform.h"
+#include "apple_client_platform_darwin.h"
 */
 import "C"
 

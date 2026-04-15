@@ -75,19 +75,12 @@ func (c *STDClientConfig) STDConfig() (*STDConfig, error) {
 }
 
 func (c *STDClientConfig) Client(conn net.Conn) (Conn, error) {
-	var spoofer tlsspoof.Spoofer
-	if c.spoof != "" {
-		var err error
-		spoofer, err = tlsspoof.NewSpoofer(conn, c.spoofMethod)
-		if err != nil {
-			return nil, err
-		}
-	}
 	if c.recordFragment {
 		conn = tf.NewConn(conn, c.ctx, c.fragment, c.recordFragment, c.fragmentFallbackDelay)
 	}
-	if spoofer != nil {
-		conn = tlsspoof.NewConn(conn, spoofer, c.spoof)
+	conn, err := applyTLSSpoof(conn, c.spoof, c.spoofMethod)
+	if err != nil {
+		return nil, err
 	}
 	return tls.Client(conn, c.config), nil
 }
@@ -234,13 +227,7 @@ func newSTDClient(ctx context.Context, logger logger.ContextLogger, serverAddres
 	} else {
 		handshakeTimeout = C.TCPTimeout
 	}
-	if options.Spoof != "" && !tlsspoof.PlatformSupported {
-		return nil, E.New("`spoof` is not supported on this platform")
-	}
-	if options.Spoof == "" && options.SpoofMethod != "" {
-		return nil, E.New("`spoof_method` requires `spoof`")
-	}
-	spoofMethod, err := tlsspoof.ParseMethod(options.SpoofMethod)
+	spoof, spoofMethod, err := parseTLSSpoofOptions(serverName, options)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +241,7 @@ func newSTDClient(ctx context.Context, logger logger.ContextLogger, serverAddres
 		fragment:              options.Fragment,
 		fragmentFallbackDelay: time.Duration(options.FragmentFallbackDelay),
 		recordFragment:        options.RecordFragment,
-		spoof:                 options.Spoof,
+		spoof:                 spoof,
 		spoofMethod:           spoofMethod,
 	}
 	config.SetServerName(serverName)

@@ -64,6 +64,15 @@ func (c *appleClientConfig) ClientHandshake(ctx context.Context, conn net.Conn) 
 	anchorPEMPtr := cStringOrNil(c.anchorPEM)
 	defer cFree(anchorPEMPtr)
 
+	var (
+		hasVerifyTime       bool
+		verifyTimeUnixMilli int64
+	)
+	if c.timeFunc != nil {
+		hasVerifyTime = true
+		verifyTimeUnixMilli = c.timeFunc().UnixMilli()
+	}
+
 	var errorPtr *C.char
 	client := C.box_apple_tls_client_create(
 		C.int(dupFD),
@@ -76,6 +85,8 @@ func (c *appleClientConfig) ClientHandshake(ctx context.Context, conn net.Conn) 
 		anchorPEMPtr,
 		C.size_t(len(c.anchorPEM)),
 		C.bool(c.anchorOnly),
+		C.bool(hasVerifyTime),
+		C.int64_t(verifyTimeUnixMilli),
 		&errorPtr,
 	)
 	if client == nil {
@@ -175,14 +186,19 @@ type appleTLSConn struct {
 	client  *C.box_apple_tls_client_t
 	state   tls.ConnectionState
 
-	readAccess  sync.Mutex
-	writeAccess sync.Mutex
-	stateAccess sync.RWMutex
-	closeOnce   sync.Once
-	ioAccess    sync.Mutex
-	ioGroup     sync.WaitGroup
-	closed      chan struct{}
-	readEOF     bool
+	readAccess     sync.Mutex
+	writeAccess    sync.Mutex
+	stateAccess    sync.RWMutex
+	closeOnce      sync.Once
+	ioAccess       sync.Mutex
+	ioGroup        sync.WaitGroup
+	closed         chan struct{}
+	readEOF        bool
+	deadlineAccess sync.Mutex
+	readDeadline   time.Time
+	writeDeadline  time.Time
+	readTimedOut   bool
+	writeTimedOut  bool
 }
 
 func (c *appleTLSConn) Read(p []byte) (int, error) {
@@ -195,6 +211,11 @@ func (c *appleTLSConn) Read(p []byte) (int, error) {
 		return 0, nil
 	}
 
+	timeoutMs, err := c.prepareReadTimeout()
+	if err != nil {
+		return 0, err
+	}
+
 	client, err := c.acquireClient()
 	if err != nil {
 		return 0, err
@@ -203,8 +224,11 @@ func (c *appleTLSConn) Read(p []byte) (int, error) {
 
 	var eof C.bool
 	var errorPtr *C.char
-	n := C.box_apple_tls_client_read(client, unsafe.Pointer(&p[0]), C.size_t(len(p)), &eof, &errorPtr)
+	n := C.box_apple_tls_client_read(client, unsafe.Pointer(&p[0]), C.size_t(len(p)), C.int(timeoutMs), &eof, &errorPtr)
 	switch {
+	case n == -2:
+		c.markReadTimedOut()
+		return 0, os.ErrDeadlineExceeded
 	case n >= 0:
 		if bool(eof) {
 			c.readEOF = true
@@ -232,6 +256,11 @@ func (c *appleTLSConn) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 
+	timeoutMs, err := c.prepareWriteTimeout()
+	if err != nil {
+		return 0, err
+	}
+
 	client, err := c.acquireClient()
 	if err != nil {
 		return 0, err
@@ -239,8 +268,12 @@ func (c *appleTLSConn) Write(p []byte) (int, error) {
 	defer c.releaseClient()
 
 	var errorPtr *C.char
-	n := C.box_apple_tls_client_write(client, unsafe.Pointer(&p[0]), C.size_t(len(p)), &errorPtr)
-	if n >= 0 {
+	n := C.box_apple_tls_client_write(client, unsafe.Pointer(&p[0]), C.size_t(len(p)), C.int(timeoutMs), &errorPtr)
+	switch {
+	case n == -2:
+		c.markWriteTimedOut()
+		return 0, os.ErrDeadlineExceeded
+	case n >= 0:
 		return int(n), nil
 	}
 	if errorPtr != nil {
@@ -276,20 +309,90 @@ func (c *appleTLSConn) RemoteAddr() net.Addr {
 	return c.rawConn.RemoteAddr()
 }
 
+// SetDeadline installs deadlines for subsequent Read and Write calls.
+//
+// Deadlines only apply to subsequent Read or Write calls; an in-flight call
+// does not observe later updates to its deadline. Callers that need to cancel
+// an in-flight I/O must Close the connection instead.
+//
+// Once an active Read or Write trips its deadline, the underlying
+// nw_connection is cancelled and the conn is no longer usable — callers must
+// Close after a deadline error.
 func (c *appleTLSConn) SetDeadline(t time.Time) error {
-	return os.ErrInvalid
+	c.deadlineAccess.Lock()
+	c.readDeadline = t
+	c.writeDeadline = t
+	c.readTimedOut = false
+	c.writeTimedOut = false
+	c.deadlineAccess.Unlock()
+	return nil
 }
 
 func (c *appleTLSConn) SetReadDeadline(t time.Time) error {
-	return os.ErrInvalid
+	c.deadlineAccess.Lock()
+	c.readDeadline = t
+	c.readTimedOut = false
+	c.deadlineAccess.Unlock()
+	return nil
 }
 
 func (c *appleTLSConn) SetWriteDeadline(t time.Time) error {
-	return os.ErrInvalid
+	c.deadlineAccess.Lock()
+	c.writeDeadline = t
+	c.writeTimedOut = false
+	c.deadlineAccess.Unlock()
+	return nil
 }
 
-func (c *appleTLSConn) NeedAdditionalReadDeadline() bool {
-	return true
+func (c *appleTLSConn) prepareReadTimeout() (int, error) {
+	c.deadlineAccess.Lock()
+	defer c.deadlineAccess.Unlock()
+	if c.readTimedOut {
+		return 0, os.ErrDeadlineExceeded
+	}
+	timeoutMs, expired := deadlineTimeoutMs(c.readDeadline)
+	if expired {
+		c.readTimedOut = true
+		return 0, os.ErrDeadlineExceeded
+	}
+	return timeoutMs, nil
+}
+
+func (c *appleTLSConn) prepareWriteTimeout() (int, error) {
+	c.deadlineAccess.Lock()
+	defer c.deadlineAccess.Unlock()
+	if c.writeTimedOut {
+		return 0, os.ErrDeadlineExceeded
+	}
+	timeoutMs, expired := deadlineTimeoutMs(c.writeDeadline)
+	if expired {
+		c.writeTimedOut = true
+		return 0, os.ErrDeadlineExceeded
+	}
+	return timeoutMs, nil
+}
+
+func (c *appleTLSConn) markReadTimedOut() {
+	c.deadlineAccess.Lock()
+	c.readTimedOut = true
+	c.deadlineAccess.Unlock()
+}
+
+func (c *appleTLSConn) markWriteTimedOut() {
+	c.deadlineAccess.Lock()
+	c.writeTimedOut = true
+	c.deadlineAccess.Unlock()
+}
+
+func deadlineTimeoutMs(deadline time.Time) (int, bool) {
+	if deadline.IsZero() {
+		return -1, false
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0, true
+	}
+	return timeoutFromDuration(remaining), false
 }
 
 func (c *appleTLSConn) isClosed() bool {

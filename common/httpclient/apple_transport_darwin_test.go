@@ -658,45 +658,24 @@ func TestAppleTransportLifecycle(t *testing.T) {
 			TLS: appleHTTPServerTLSOptions(server),
 		},
 	})
-	clone := transport.Clone()
-	t.Cleanup(func() {
-		_ = clone.Close()
-	})
 
 	assertAppleHTTPSucceeds(t, transport, server.URL("/original"))
-	assertAppleHTTPSucceeds(t, clone, server.URL("/clone"))
 
 	transport.CloseIdleConnections()
 	assertAppleHTTPSucceeds(t, transport, server.URL("/reset"))
 
-	if err := transport.Close(); err != nil {
+	innerTransport := transport.(*appleTransport)
+	if err := innerTransport.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	response, err := transport.RoundTrip(newAppleHTTPRequest(t, http.MethodGet, server.URL("/closed"), nil))
+	response, err := innerTransport.RoundTrip(newAppleHTTPRequest(t, http.MethodGet, server.URL("/closed"), nil))
 	if err == nil {
 		response.Body.Close()
 		t.Fatal("expected closed transport to fail")
 	}
 	if !errors.Is(err, net.ErrClosed) {
 		t.Fatalf("unexpected closed transport error: %v", err)
-	}
-
-	assertAppleHTTPSucceeds(t, clone, server.URL("/clone-after-original-close"))
-
-	clone.CloseIdleConnections()
-	assertAppleHTTPSucceeds(t, clone, server.URL("/clone-reset"))
-
-	if err := clone.Close(); err != nil {
-		t.Fatal(err)
-	}
-	response, err = clone.RoundTrip(newAppleHTTPRequest(t, http.MethodGet, server.URL("/clone-closed"), nil))
-	if err == nil {
-		response.Body.Close()
-		t.Fatal("expected closed clone to fail")
-	}
-	if !errors.Is(err, net.ErrClosed) {
-		t.Fatalf("unexpected closed clone error: %v", err)
 	}
 }
 
@@ -740,7 +719,7 @@ func (s *appleHTTPTestServer) URL(path string) string {
 	return s.baseURL + "/" + path
 }
 
-func newAppleHTTPTestTransport(t *testing.T, server *appleHTTPTestServer, options option.HTTPClientOptions) adapter.HTTPTransport {
+func newAppleHTTPTestTransport(t *testing.T, server *appleHTTPTestServer, options option.HTTPClientOptions) innerTransport {
 	t.Helper()
 
 	ctx := service.ContextWith[adapter.ConnectionManager](
@@ -862,7 +841,7 @@ func readResponseBody(t *testing.T, response *http.Response) string {
 	return string(body)
 }
 
-func assertAppleHTTPSucceeds(t *testing.T, transport adapter.HTTPTransport, rawURL string) {
+func assertAppleHTTPSucceeds(t *testing.T, transport http.RoundTripper, rawURL string) {
 	t.Helper()
 
 	response, err := transport.RoundTrip(newAppleHTTPRequest(t, http.MethodGet, rawURL, nil))

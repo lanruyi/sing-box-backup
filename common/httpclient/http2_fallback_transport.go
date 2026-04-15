@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -77,14 +76,6 @@ func (t *http2FallbackTransport) roundTrip(request *http.Request, allowHTTP1Fall
 func (t *http2FallbackTransport) CloseIdleConnections() {
 	t.h1Transport.CloseIdleConnections()
 	t.h2Transport.CloseIdleConnections()
-}
-
-func (t *http2FallbackTransport) Clone() adapter.HTTPTransport {
-	return &http2FallbackTransport{
-		h2Transport: CloneHTTP2Transport(t.h2Transport),
-		h1Transport: t.h1Transport.Clone().(*http1Transport),
-		h2Fallback:  t.h2Fallback,
-	}
 }
 
 func (t *http2FallbackTransport) Close() error {

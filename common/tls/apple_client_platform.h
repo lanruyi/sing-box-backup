@@ -25,13 +25,15 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 	const char *anchor_pem,
 	size_t anchor_pem_len,
 	bool anchor_only,
+	bool has_verify_time,
+	int64_t verify_time_unix_millis,
 	char **error_out
 );
 
 int box_apple_tls_client_wait_ready(box_apple_tls_client_t *client, int timeout_msec, char **error_out);
 void box_apple_tls_client_cancel(box_apple_tls_client_t *client);
 void box_apple_tls_client_free(box_apple_tls_client_t *client);
-ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, size_t buffer_len, bool *eof_out, char **error_out);
-ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *buffer, size_t buffer_len, char **error_out);
+ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, size_t buffer_len, int timeout_msec, bool *eof_out, char **error_out);
+ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *buffer, size_t buffer_len, int timeout_msec, char **error_out);
 bool box_apple_tls_client_copy_state(box_apple_tls_client_t *client, box_apple_tls_state_t *state, char **error_out);
 void box_apple_tls_state_free(box_apple_tls_state_t *state);

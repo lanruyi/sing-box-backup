@@ -22,9 +22,9 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
-	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/proxybridge"
 	boxTLS "github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/option"
@@ -32,6 +32,7 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
 	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/common/ntp"
 )
 
 const applePinnedHashSize = sha256.Size
@@ -69,10 +70,11 @@ type appleSessionConfig struct {
 }
 
 type appleTransportShared struct {
-	logger logger.ContextLogger
-	bridge *proxybridge.Bridge
-	config appleSessionConfig
-	refs   atomic.Int32
+	logger   logger.ContextLogger
+	bridge   *proxybridge.Bridge
+	config   appleSessionConfig
+	timeFunc func() time.Time
+	refs     atomic.Int32
 }
 
 type appleTransport struct {
@@ -82,11 +84,7 @@ type appleTransport struct {
 	closed  bool
 }
 
-type errorTransport struct {
-	err error
-}
-
-func newAppleTransport(ctx context.Context, logger logger.ContextLogger, rawDialer N.Dialer, options option.HTTPClientOptions) (adapter.HTTPTransport, error) {
+func newAppleTransport(ctx context.Context, logger logger.ContextLogger, rawDialer N.Dialer, options option.HTTPClientOptions) (innerTransport, error) {
 	sessionConfig, err := newAppleSessionConfig(ctx, options)
 	if err != nil {
 		return nil, err
@@ -96,9 +94,10 @@ func newAppleTransport(ctx context.Context, logger logger.ContextLogger, rawDial
 		return nil, err
 	}
 	shared := &appleTransportShared{
-		logger: logger,
-		bridge: bridge,
-		config: sessionConfig,
+		logger:   logger,
+		bridge:   bridge,
+		config:   sessionConfig,
+		timeFunc: ntp.TimeFuncFromContext(ctx),
 	}
 	shared.refs.Store(1)
 	session, err := shared.newSession()
@@ -279,14 +278,24 @@ func (t *appleTransport) RoundTrip(request *http.Request) (*http.Response, error
 		bodyPointer = (*C.uint8_t)(C.CBytes(body))
 		defer C.free(unsafe.Pointer(bodyPointer))
 	}
+	var (
+		hasVerifyTime       bool
+		verifyTimeUnixMilli int64
+	)
+	if t.shared.timeFunc != nil {
+		hasVerifyTime = true
+		verifyTimeUnixMilli = t.shared.timeFunc().UnixMilli()
+	}
 	cRequest := C.box_apple_http_request_t{
-		method:        cMethod,
-		url:           cURL,
-		header_keys:   (**C.char)(headerKeysPointer),
-		header_values: (**C.char)(headerValuesPointer),
-		header_count:  C.size_t(len(cHeaderKeys)),
-		body:          bodyPointer,
-		body_len:      C.size_t(len(body)),
+		method:                  cMethod,
+		url:                     cURL,
+		header_keys:             (**C.char)(headerKeysPointer),
+		header_values:           (**C.char)(headerValuesPointer),
+		header_count:            C.size_t(len(cHeaderKeys)),
+		body:                    bodyPointer,
+		body_len:                C.size_t(len(body)),
+		has_verify_time:         C.bool(hasVerifyTime),
+		verify_time_unix_millis: C.int64_t(verifyTimeUnixMilli),
 	}
 	var cErr *C.char
 	var task *C.box_apple_http_task_t
@@ -350,19 +359,6 @@ func (t *appleTransport) CloseIdleConnections() {
 	C.box_apple_http_session_retire(oldSession)
 }
 
-func (t *appleTransport) Clone() adapter.HTTPTransport {
-	t.shared.retain()
-	session, err := t.shared.newSession()
-	if err != nil {
-		_ = t.shared.release()
-		return &errorTransport{err: err}
-	}
-	return &appleTransport{
-		shared:  t.shared,
-		session: session,
-	}
-}
-
 func (t *appleTransport) Close() error {
 	t.access.Lock()
 	if t.closed {
@@ -375,21 +371,6 @@ func (t *appleTransport) Close() error {
 	t.access.Unlock()
 	C.box_apple_http_session_close(session)
 	return t.shared.release()
-}
-
-func (t *errorTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	return nil, t.err
-}
-
-func (t *errorTransport) CloseIdleConnections() {
-}
-
-func (t *errorTransport) Clone() adapter.HTTPTransport {
-	return &errorTransport{err: t.err}
-}
-
-func (t *errorTransport) Close() error {
-	return nil
 }
 
 func flattenRequestHeaders(request *http.Request) ([]string, []string) {

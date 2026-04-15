@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -35,10 +34,6 @@ func (t *http1Transport) RoundTrip(request *http.Request) (*http.Response, error
 
 func (t *http1Transport) CloseIdleConnections() {
 	t.transport.CloseIdleConnections()
-}
-
-func (t *http1Transport) Clone() adapter.HTTPTransport {
-	return &http1Transport{transport: t.transport.Clone()}
 }
 
 func (t *http1Transport) Close() error {

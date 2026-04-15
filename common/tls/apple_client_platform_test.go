@@ -5,7 +5,9 @@ package tls
 import (
 	"context"
 	stdtls "crypto/tls"
+	"errors"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -205,6 +207,156 @@ func TestAppleClientHandshakeRecoversAfterFailure(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAppleClientReadDeadline(t *testing.T) {
+	serverCertificate, serverCertificatePEM := newAppleTestCertificate(t, "localhost")
+	serverDone, serverAddress := startAppleTLSSilentServer(t, &stdtls.Config{
+		Certificates: []stdtls.Certificate{serverCertificate},
+		MinVersion:   stdtls.VersionTLS12,
+		MaxVersion:   stdtls.VersionTLS12,
+	})
+
+	clientConn, err := newAppleTestClientConn(t, serverAddress, option.OutboundTLSOptions{
+		Enabled:     true,
+		Engine:      "apple",
+		ServerName:  "localhost",
+		MinVersion:  "1.2",
+		MaxVersion:  "1.2",
+		Certificate: badoption.Listable[string]{serverCertificatePEM},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientConn.Close()
+	defer close(serverDone)
+
+	err = clientConn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if err != nil {
+		t.Fatalf("SetReadDeadline: %v", err)
+	}
+
+	readDone := make(chan error, 1)
+	buffer := make([]byte, 64)
+	go func() {
+		_, readErr := clientConn.Read(buffer)
+		readDone <- readErr
+	}()
+
+	select {
+	case readErr := <-readDone:
+		if !errors.Is(readErr, os.ErrDeadlineExceeded) {
+			t.Fatalf("expected os.ErrDeadlineExceeded, got %v", readErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Read did not return within 2s after deadline")
+	}
+
+	_, err = clientConn.Read(buffer)
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("sticky deadline: expected os.ErrDeadlineExceeded, got %v", err)
+	}
+}
+
+func TestAppleClientSetDeadlineClearsPreExpiredSticky(t *testing.T) {
+	serverCertificate, serverCertificatePEM := newAppleTestCertificate(t, "localhost")
+	serverDone, serverAddress := startAppleTLSSilentServer(t, &stdtls.Config{
+		Certificates: []stdtls.Certificate{serverCertificate},
+		MinVersion:   stdtls.VersionTLS12,
+		MaxVersion:   stdtls.VersionTLS12,
+	})
+
+	clientConn, err := newAppleTestClientConn(t, serverAddress, option.OutboundTLSOptions{
+		Enabled:     true,
+		Engine:      "apple",
+		ServerName:  "localhost",
+		MinVersion:  "1.2",
+		MaxVersion:  "1.2",
+		Certificate: badoption.Listable[string]{serverCertificatePEM},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientConn.Close()
+	defer close(serverDone)
+
+	err = clientConn.SetReadDeadline(time.Now().Add(-time.Second))
+	if err != nil {
+		t.Fatalf("SetReadDeadline past: %v", err)
+	}
+
+	// Pre-expired deadline trips sticky flag without cancelling nw_connection
+	// (prepareReadTimeout short-circuits before the C read is issued).
+	buffer := make([]byte, 64)
+	_, err = clientConn.Read(buffer)
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("pre-expired: expected os.ErrDeadlineExceeded, got %v", err)
+	}
+
+	err = clientConn.SetReadDeadline(time.Time{})
+	if err != nil {
+		t.Fatalf("SetReadDeadline zero: %v", err)
+	}
+
+	newDeadline := 300 * time.Millisecond
+	err = clientConn.SetReadDeadline(time.Now().Add(newDeadline))
+	if err != nil {
+		t.Fatalf("SetReadDeadline future: %v", err)
+	}
+
+	readStart := time.Now()
+	_, err = clientConn.Read(buffer)
+	readElapsed := time.Since(readStart)
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("after clear: expected os.ErrDeadlineExceeded, got %v", err)
+	}
+	if readElapsed < newDeadline-50*time.Millisecond {
+		t.Fatalf("sticky flag was not cleared: Read returned after %v, expected ~%v", readElapsed, newDeadline)
+	}
+}
+
+func startAppleTLSSilentServer(t *testing.T, tlsConfig *stdtls.Config) (chan<- struct{}, string) {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		listener.Close()
+	})
+
+	if tcpListener, isTCP := listener.(*net.TCPListener); isTCP {
+		err = tcpListener.SetDeadline(time.Now().Add(appleTLSTestTimeout))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	done := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		defer conn.Close()
+		handshakeErr := conn.SetDeadline(time.Now().Add(appleTLSTestTimeout))
+		if handshakeErr != nil {
+			return
+		}
+		tlsConn := stdtls.Server(conn, tlsConfig)
+		defer tlsConn.Close()
+		handshakeErr = tlsConn.Handshake()
+		if handshakeErr != nil {
+			return
+		}
+		handshakeErr = conn.SetDeadline(time.Time{})
+		if handshakeErr != nil {
+			return
+		}
+		<-done
+	}()
+	return done, listener.Addr().String()
 }
 
 func newAppleTestCertificate(t *testing.T, serverName string) (stdtls.Certificate, string) {

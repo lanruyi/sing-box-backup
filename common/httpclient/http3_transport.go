@@ -12,7 +12,6 @@ import (
 
 	"github.com/sagernet/quic-go"
 	"github.com/sagernet/quic-go/http3"
-	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/bufio"
@@ -27,7 +26,7 @@ type http3Transport struct {
 
 type http3FallbackTransport struct {
 	h3Transport   *http3.Transport
-	h2Fallback    adapter.HTTPTransport
+	h2Fallback    innerTransport
 	fallbackDelay time.Duration
 	brokenAccess  sync.Mutex
 	brokenUntil   time.Time
@@ -98,7 +97,7 @@ func newHTTP3Transport(
 	rawDialer N.Dialer,
 	baseTLSConfig tls.Config,
 	options option.QUICOptions,
-) (adapter.HTTPTransport, error) {
+) (innerTransport, error) {
 	return &http3Transport{
 		h3Transport: newHTTP3RoundTripper(rawDialer, baseTLSConfig, options),
 	}, nil
@@ -107,10 +106,10 @@ func newHTTP3Transport(
 func newHTTP3FallbackTransport(
 	rawDialer N.Dialer,
 	baseTLSConfig tls.Config,
-	h2Fallback adapter.HTTPTransport,
+	h2Fallback innerTransport,
 	options option.QUICOptions,
 	fallbackDelay time.Duration,
-) (adapter.HTTPTransport, error) {
+) (innerTransport, error) {
 	return &http3FallbackTransport{
 		h3Transport:   newHTTP3RoundTripper(rawDialer, baseTLSConfig, options),
 		h2Fallback:    h2Fallback,
@@ -129,12 +128,6 @@ func (t *http3Transport) CloseIdleConnections() {
 func (t *http3Transport) Close() error {
 	t.CloseIdleConnections()
 	return t.h3Transport.Close()
-}
-
-func (t *http3Transport) Clone() adapter.HTTPTransport {
-	return &http3Transport{
-		h3Transport: t.h3Transport,
-	}
 }
 
 func (t *http3FallbackTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -274,14 +267,6 @@ func (t *http3FallbackTransport) CloseIdleConnections() {
 func (t *http3FallbackTransport) Close() error {
 	t.CloseIdleConnections()
 	return t.h3Transport.Close()
-}
-
-func (t *http3FallbackTransport) Clone() adapter.HTTPTransport {
-	return &http3FallbackTransport{
-		h3Transport:   t.h3Transport,
-		h2Fallback:    t.h2Fallback.Clone(),
-		fallbackDelay: t.fallbackDelay,
-	}
 }
 
 func (t *http3FallbackTransport) h3Broken() bool {

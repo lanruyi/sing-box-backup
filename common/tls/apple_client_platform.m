@@ -208,10 +208,14 @@ static NSArray *box_parse_certificates_from_pem(const char *pem, size_t pem_len)
 	return certificates;
 }
 
-static bool box_evaluate_trust(sec_trust_t trust, NSArray *anchors, bool anchor_only) {
+static bool box_evaluate_trust(sec_trust_t trust, NSArray *anchors, bool anchor_only, NSDate *verify_date) {
 	bool result = false;
 	SecTrustRef trustRef = sec_trust_copy_ref(trust);
 	if (trustRef == NULL) {
+		return false;
+	}
+	if (verify_date != nil && SecTrustSetVerifyDate(trustRef, (__bridge CFDateRef)verify_date) != errSecSuccess) {
+		CFRelease(trustRef);
 		return false;
 	}
 	if (anchors.count > 0 || anchor_only) {
@@ -347,6 +351,8 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 	const char *anchor_pem,
 	size_t anchor_pem_len,
 	bool anchor_only,
+	bool has_verify_time,
+	int64_t verify_time_unix_millis,
 	char **error_out
 ) {
 	box_apple_tls_client_t *client = calloc(1, sizeof(box_apple_tls_client_t));
@@ -363,6 +369,10 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 
 	NSArray<NSString *> *alpnList = box_split_lines(alpn, alpn_len);
 	NSArray *anchors = box_parse_certificates_from_pem(anchor_pem, anchor_pem_len);
+	NSDate *verifyDate = nil;
+	if (has_verify_time) {
+		verifyDate = [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)verify_time_unix_millis / 1000.0];
+	}
 	nw_parameters_t parameters = nw_parameters_create_secure_tcp(^(nw_protocol_options_t tls_options) {
 		sec_protocol_options_t sec_options = nw_tls_copy_sec_protocol_options(tls_options);
 		if (min_version != 0) {
@@ -382,9 +392,9 @@ box_apple_tls_client_t *box_apple_tls_client_create(
 			sec_protocol_options_set_verify_block(sec_options, ^(sec_protocol_metadata_t metadata, sec_trust_t trust, sec_protocol_verify_complete_t complete) {
 				complete(true);
 			}, box_apple_tls_client_queue(client));
-		} else if (anchors.count > 0 || anchor_only) {
+		} else if (verifyDate != nil || anchors.count > 0 || anchor_only) {
 			sec_protocol_options_set_verify_block(sec_options, ^(sec_protocol_metadata_t metadata, sec_trust_t trust, sec_protocol_verify_complete_t complete) {
-				complete(box_evaluate_trust(trust, anchors, anchor_only));
+				complete(box_evaluate_trust(trust, anchors, anchor_only, verifyDate));
 			}, box_apple_tls_client_queue(client));
 		}
 	}, NW_PARAMETERS_DEFAULT_CONFIGURATION);
@@ -493,7 +503,7 @@ void box_apple_tls_client_free(box_apple_tls_client_t *client) {
 	box_apple_tls_client_release(client);
 }
 
-ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, size_t buffer_len, bool *eof_out, char **error_out) {
+ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, size_t buffer_len, int timeout_msec, bool *eof_out, char **error_out) {
 	nw_connection_t connection = box_apple_tls_connection(client);
 	if (connection == nil) {
 		box_set_error_message(error_out, "apple TLS: invalid client");
@@ -524,7 +534,20 @@ ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, 
 		dispatch_semaphore_signal(read_semaphore);
 	});
 
-	dispatch_semaphore_wait(read_semaphore, DISPATCH_TIME_FOREVER);
+	dispatch_time_t wait_deadline = DISPATCH_TIME_FOREVER;
+	if (timeout_msec >= 0) {
+		wait_deadline = dispatch_time(DISPATCH_TIME_NOW, (int64_t)timeout_msec * NSEC_PER_MSEC);
+	}
+	long wait_result = dispatch_semaphore_wait(read_semaphore, wait_deadline);
+	if (wait_result != 0) {
+		nw_connection_cancel(connection);
+		dispatch_semaphore_wait(read_semaphore, DISPATCH_TIME_FOREVER);
+		if (local_error != NULL) {
+			free(local_error);
+			local_error = NULL;
+		}
+		return -2;
+	}
 	if (local_error != NULL) {
 		if (error_out != NULL) {
 			*error_out = local_error;
@@ -543,7 +566,7 @@ ssize_t box_apple_tls_client_read(box_apple_tls_client_t *client, void *buffer, 
 	return (ssize_t)content_data.length;
 }
 
-ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *buffer, size_t buffer_len, char **error_out) {
+ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *buffer, size_t buffer_len, int timeout_msec, char **error_out) {
 	nw_connection_t connection = box_apple_tls_connection(client);
 	if (connection == nil) {
 		box_set_error_message(error_out, "apple TLS: invalid client");
@@ -580,7 +603,20 @@ ssize_t box_apple_tls_client_write(box_apple_tls_client_t *client, const void *b
 		dispatch_semaphore_signal(write_semaphore);
 	});
 
-	dispatch_semaphore_wait(write_semaphore, DISPATCH_TIME_FOREVER);
+	dispatch_time_t wait_deadline = DISPATCH_TIME_FOREVER;
+	if (timeout_msec >= 0) {
+		wait_deadline = dispatch_time(DISPATCH_TIME_NOW, (int64_t)timeout_msec * NSEC_PER_MSEC);
+	}
+	long wait_result = dispatch_semaphore_wait(write_semaphore, wait_deadline);
+	if (wait_result != 0) {
+		nw_connection_cancel(connection);
+		dispatch_semaphore_wait(write_semaphore, DISPATCH_TIME_FOREVER);
+		if (local_error != NULL) {
+			free(local_error);
+			local_error = NULL;
+		}
+		return -2;
+	}
 	if (local_error != NULL) {
 		if (error_out != NULL) {
 			*error_out = local_error;

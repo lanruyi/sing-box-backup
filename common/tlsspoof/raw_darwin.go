@@ -9,6 +9,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/sagernet/sing-tun/gtcpip/header"
 	E "github.com/sagernet/sing/common/exceptions"
 
 	"golang.org/x/sys/unix"
@@ -64,11 +65,10 @@ type darwinSpoofer struct {
 	rawSockAddr unix.Sockaddr
 	sendNext    uint32
 	receiveNext uint32
-	mss         int
 }
 
 func newRawSpoofer(conn net.Conn, method Method) (Spoofer, error) {
-	tcpConn, src, dst, err := tcpEndpoints(conn)
+	_, src, dst, err := tcpEndpoints(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -81,11 +81,6 @@ func newRawSpoofer(conn net.Conn, method Method) (Spoofer, error) {
 		unix.Close(fd)
 		return nil, err
 	}
-	mss := defaultMSS(src.Addr().Is4())
-	readMSS, mssErr := readTCPMaxSeg(tcpConn)
-	if mssErr == nil && readMSS > 0 {
-		mss = readMSS
-	}
 	return &darwinSpoofer{
 		method:      method,
 		src:         src,
@@ -94,7 +89,6 @@ func newRawSpoofer(conn net.Conn, method Method) (Spoofer, error) {
 		rawSockAddr: sockaddr,
 		sendNext:    sendNext,
 		receiveNext: receiveNext,
-		mss:         mss,
 	}, nil
 }
 
@@ -165,34 +159,29 @@ func openDarwinRawSocket(src, dst netip.AddrPort) (int, unix.Sockaddr, error) {
 
 func (s *darwinSpoofer) Inject(payload []byte) error {
 	if !s.src.Addr().Is4() {
-		segments, err := buildSpoofSegments(s.method, s.src, s.dst, s.sendNext, s.receiveNext, payload, s.mss)
+		segment, err := buildSpoofTCPSegment(s.method, s.src, s.dst, s.sendNext, s.receiveNext, payload)
 		if err != nil {
 			return err
 		}
-		for _, segment := range segments {
-			err = unix.Sendto(s.rawFD, segment, 0, s.rawSockAddr)
-			if err != nil {
-				return E.Cause(err, "sendto raw socket")
-			}
-		}
-		return nil
-	}
-	frames, err := buildSpoofFrames(s.method, s.src, s.dst, s.sendNext, s.receiveNext, payload, s.mss)
-	if err != nil {
-		return err
-	}
-	for _, frame := range frames {
-		// Darwin inherits the historical BSD quirk: with IP_HDRINCL the kernel
-		// expects ip_len and ip_off in host byte order, not network byte order.
-		// Apple's rip_output swaps them back before transmission.
-		totalLen := binary.BigEndian.Uint16(frame[2:4])
-		binary.NativeEndian.PutUint16(frame[2:4], totalLen)
-		fragOff := binary.BigEndian.Uint16(frame[6:8])
-		binary.NativeEndian.PutUint16(frame[6:8], fragOff)
-		err = unix.Sendto(s.rawFD, frame, 0, s.rawSockAddr)
+		err = unix.Sendto(s.rawFD, segment, 0, s.rawSockAddr)
 		if err != nil {
 			return E.Cause(err, "sendto raw socket")
 		}
+		return nil
+	}
+	frame, err := buildSpoofFrame(s.method, s.src, s.dst, s.sendNext, s.receiveNext, payload)
+	if err != nil {
+		return err
+	}
+	// Darwin inherits the historical BSD quirk: with IP_HDRINCL the kernel
+	// expects ip_len and ip_off in host byte order, not network byte order.
+	// Apple's rip_output swaps them back before transmission.
+	ip := header.IPv4(frame)
+	ip.SetTotalLengthDarwinRaw(ip.TotalLength())
+	ip.SetFlagsFragmentOffsetDarwinRaw(ip.Flags(), ip.FragmentOffset())
+	err = unix.Sendto(s.rawFD, frame, 0, s.rawSockAddr)
+	if err != nil {
+		return E.Cause(err, "sendto raw socket")
 	}
 	return nil
 }

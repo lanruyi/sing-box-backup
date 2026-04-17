@@ -88,7 +88,8 @@ func TestIntegrationConn_RealTLSHandshake(t *testing.T) {
 
 	spoofer, err := NewSpoofer(raw, MethodWrongSequence)
 	require.NoError(t, err)
-	wrapped := NewConn(raw, spoofer, fakeSNI)
+	wrapped, err := NewConn(raw, spoofer, fakeSNI)
+	require.NoError(t, err)
 
 	clientConfig := &tls.Config{
 		ServerName:         realSNI,

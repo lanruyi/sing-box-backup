@@ -27,7 +27,6 @@ type linuxSpoofer struct {
 	rawSockAddr unix.Sockaddr
 	sendNext    uint32
 	receiveNext uint32
-	mss         int
 }
 
 func newRawSpoofer(conn net.Conn, method Method) (Spoofer, error) {
@@ -45,16 +44,11 @@ func newRawSpoofer(conn net.Conn, method Method) (Spoofer, error) {
 		dst:         dst,
 		rawFD:       fd,
 		rawSockAddr: sockaddr,
-		mss:         defaultMSS(src.Addr().Is4()),
 	}
 	err = spoofer.loadSequenceNumbers(tcpConn)
 	if err != nil {
 		unix.Close(fd)
 		return nil, err
-	}
-	mss, mssErr := readTCPMaxSeg(tcpConn)
-	if mssErr == nil && mss > 0 {
-		spoofer.mss = mss
 	}
 	return spoofer, nil
 }
@@ -124,15 +118,13 @@ func (s *linuxSpoofer) loadSequenceNumbers(tcpConn *net.TCPConn) error {
 }
 
 func (s *linuxSpoofer) Inject(payload []byte) error {
-	frames, err := buildSpoofFrames(s.method, s.src, s.dst, s.sendNext, s.receiveNext, payload, s.mss)
+	frame, err := buildSpoofFrame(s.method, s.src, s.dst, s.sendNext, s.receiveNext, payload)
 	if err != nil {
 		return err
 	}
-	for _, frame := range frames {
-		err = unix.Sendto(s.rawFD, frame, 0, s.rawSockAddr)
-		if err != nil {
-			return E.Cause(err, "sendto raw socket")
-		}
+	err = unix.Sendto(s.rawFD, frame, 0, s.rawSockAddr)
+	if err != nil {
+		return E.Cause(err, "sendto raw socket")
 	}
 	return nil
 }

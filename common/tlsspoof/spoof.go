@@ -51,17 +51,21 @@ func NewSpoofer(conn net.Conn, method Method) (Spoofer, error) {
 
 type Conn struct {
 	net.Conn
-	spoofer  Spoofer
-	fakeSNI  string
-	injected bool
+	spoofer   Spoofer
+	fakeHello []byte
+	injected  bool
 }
 
-func NewConn(conn net.Conn, spoofer Spoofer, fakeSNI string) *Conn {
-	return &Conn{
-		Conn:    conn,
-		spoofer: spoofer,
-		fakeSNI: fakeSNI,
+func NewConn(conn net.Conn, spoofer Spoofer, fakeSNI string) (*Conn, error) {
+	fakeHello, err := buildFakeClientHello(fakeSNI)
+	if err != nil {
+		return nil, E.Cause(err, "tls_spoof: build fake ClientHello")
 	}
+	return &Conn{
+		Conn:      conn,
+		spoofer:   spoofer,
+		fakeHello: fakeHello,
+	}, nil
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
@@ -74,11 +78,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 			err = E.Cause(closeErr, "tls_spoof: close spoofer")
 		}
 	}()
-	fake, err := rewriteSNI(b, c.fakeSNI)
-	if err != nil {
-		return 0, E.Cause(err, "tls_spoof: rewrite SNI")
-	}
-	err = c.spoofer.Inject(fake)
+	err = c.spoofer.Inject(c.fakeHello)
 	if err != nil {
 		return 0, E.Cause(err, "tls_spoof: inject")
 	}

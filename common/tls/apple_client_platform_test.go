@@ -84,6 +84,29 @@ func TestAppleClientHandshakeAppliesALPNAndVersion(t *testing.T) {
 	}
 }
 
+func TestAppleClientHandshakeRejectsOpaqueConn(t *testing.T) {
+	clientConfig, err := NewClientWithOptions(ClientOptions{
+		Context: context.Background(),
+		Logger:  logger.NOP(),
+		Options: option.OutboundTLSOptions{
+			Enabled:    true,
+			Engine:     "apple",
+			ServerName: "localhost",
+			Insecure:   true,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	_, err = ClientHandshake(context.Background(), clientConn, clientConfig)
+	if err == nil {
+		t.Fatal("expected handshake to reject non-TCP connection")
+	}
+}
+
 func TestAppleClientHandshakeRejectsVersionMismatch(t *testing.T) {
 	serverCertificate, serverCertificatePEM := newAppleTestCertificate(t, "localhost")
 	serverResult, serverAddress := startAppleTLSTestServer(t, &stdtls.Config{

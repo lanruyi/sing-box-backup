@@ -8,6 +8,7 @@ icon: material/new-box
     :material-plus: [handshake_timeout](#handshake_timeout)  
     :material-plus: [spoof](#spoof)  
     :material-plus: [spoof_method](#spoof_method)  
+    :material-plus: [engine](#engine)  
     :material-delete-clock: [acme](#acme-字段)
 
 !!! quote "sing-box 1.13.0 中的更改"
@@ -195,6 +196,8 @@ TLS 版本值：
 
 #### engine
 
+!!! question "自 sing-box 1.14.0 起"
+
 ==仅客户端==
 
 要使用的 TLS 引擎。
@@ -204,14 +207,6 @@ TLS 版本值：
 * `go`（默认）
 * `apple`
 * `windows`
-
-`apple` 使用 Network.framework，仅在 Apple 平台可用，且仅支持 **直接** TCP TLS 客户端连接。
-
-!!! warning ""
-
-    仅供实验用途：由于 CGO 和 Network.framework 占用的内存都很多，
-    不应在 iOS 和 tvOS 的热路径中使用。
-    如果您想规避基于 TLS 指纹的代理审查，应使用 [NaiveProxy](/zh/configuration/outbound/naive/)。
 
 支持的字段：
 
@@ -236,7 +231,9 @@ TLS 版本值：
 * `utls`
 * `reality`
 
-`windows` 通过 SSPI 使用 Schannel，仅在 Windows build 17763 及以上可用，包括 Windows 10 版本 1809、Windows Server 2019 及后续版本，且仅支持 **直接** TCP TLS 客户端连接。
+!!! note ""
+
+    `windows` 通过 SSPI 使用 Schannel，仅在 Windows build 17763 及以上可用，包括 Windows 10 版本 1809、Windows Server 2019 及后续版本。
 
 !!! note ""
 

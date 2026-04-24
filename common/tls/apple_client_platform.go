@@ -23,11 +23,9 @@ import (
 	"runtime/cgo"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
-	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	E "github.com/sagernet/sing/common/exceptions"
 	N "github.com/sagernet/sing/common/network"
@@ -36,11 +34,11 @@ import (
 )
 
 func (c *appleClientConfig) ClientHandshake(ctx context.Context, conn net.Conn) (Conn, error) {
-	rawSyscallConn, ok := common.Cast[syscall.Conn](conn)
+	tcpConn, ok := N.UnwrapReader(conn).(*net.TCPConn)
 	if !ok {
 		return nil, E.New("apple TLS: requires fd-backed TCP connection")
 	}
-	syscallConn, err := rawSyscallConn.SyscallConn()
+	syscallConn, err := tcpConn.SyscallConn()
 	if err != nil {
 		return nil, E.Cause(err, "access raw connection")
 	}

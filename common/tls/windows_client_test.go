@@ -279,6 +279,10 @@ func (a windowsTestAddr) String() string {
 	return string(a)
 }
 
+type windowsOpaqueConn struct {
+	net.Conn
+}
+
 func TestWindowsClientHandshakeTLS12(t *testing.T) {
 	serverCertificate, serverCertificatePEM := newWindowsTestCertificate(t, "localhost")
 	serverResult, serverAddress := startWindowsTLSTestServer(t, &stdtls.Config{
@@ -325,6 +329,51 @@ func TestWindowsClientHandshakeTLS12(t *testing.T) {
 	}
 	if result.state.NegotiatedProtocol != "h2" {
 		t.Fatalf("server negotiated unexpected protocol: %q", result.state.NegotiatedProtocol)
+	}
+}
+
+func TestWindowsClientHandshakeWrappedConn(t *testing.T) {
+	serverCertificate, serverCertificatePEM := newWindowsTestCertificate(t, "localhost")
+	serverResult, serverAddress := startWindowsTLSTestServer(t, &stdtls.Config{
+		Certificates: []stdtls.Certificate{serverCertificate},
+		MinVersion:   stdtls.VersionTLS12,
+		MaxVersion:   stdtls.VersionTLS12,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), windowsTLSTestTimeout)
+	t.Cleanup(cancel)
+
+	clientConfig, err := NewClientWithOptions(ClientOptions{
+		Context: ctx,
+		Logger:  logger.NOP(),
+		Options: option.OutboundTLSOptions{
+			Enabled:     true,
+			Engine:      C.TLSEngineWindows,
+			ServerName:  "localhost",
+			MinVersion:  "1.2",
+			Certificate: badoption.Listable[string]{serverCertificatePEM},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawConn, err := net.DialTimeout(N.NetworkTCP, serverAddress, windowsTLSTestTimeout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tlsConn, err := ClientHandshake(ctx, windowsOpaqueConn{Conn: rawConn}, clientConfig)
+	if err != nil {
+		rawConn.Close()
+		t.Fatal(err)
+	}
+	_ = tlsConn.Close()
+
+	result := <-serverResult
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	if result.state.Version != stdtls.VersionTLS12 {
+		t.Fatalf("server negotiated unexpected version: %x", result.state.Version)
 	}
 }
 

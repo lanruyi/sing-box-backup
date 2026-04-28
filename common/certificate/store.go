@@ -145,7 +145,6 @@ func (s *Store) ExclusiveAnchors() bool {
 
 func (s *Store) update() error {
 	currentPool, err := s.newBasePool()
-	var currentPEM []string
 	if err != nil {
 		return err
 	}
@@ -156,13 +155,13 @@ func (s *Store) update() error {
 		if !currentPool.AppendCertsFromPEM([]byte(pemContent)) {
 			return E.New("invalid Mozilla included certificate PEM")
 		}
-		currentPEM = append(currentPEM, pemContent)
+		appendPEMBlock(pemBuffer, string(pemContent))
 	case C.CertificateStoreChrome:
 		pemContent := chromeIncludedPEM()
 		if !currentPool.AppendCertsFromPEM([]byte(pemContent)) {
 			return E.New("invalid Chrome included certificate PEM")
 		}
-		currentPEM = append(currentPEM, pemContent)
+		appendPEMBlock(pemBuffer, string(pemContent))
 	}
 	if s.certificate != "" {
 		if !currentPool.AppendCertsFromPEM([]byte(s.certificate)) {

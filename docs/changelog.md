@@ -9,6 +9,7 @@ icon: material/alert-decagram
 * Add `preferred_by` DNS rule item **3**
 * Add neighbor-based hostname resolution for the local DNS server **4**
 * Update NaiveProxy to 148.0.7778.96-1
+* Add more TLS spoof methods and route rule action support **5**
 ** Fixes and improvements
 
 **1**:
@@ -51,6 +52,14 @@ on the local DNS server. Listed suffixes (each starting with `.`) cause
 A/AAAA queries for single-label hosts under those suffixes to be answered
 from the [neighbor resolver](/configuration/shared/neighbor/) instead of
 the upstream (for example `[".", ".lan"]`).
+
+**5**:
+
+Adds `wrong-ack`, `wrong-md5`, and `wrong-timestamp`
+[spoof methods](/configuration/shared/tls/#spoof_method), and adds
+[`tls_spoof`](/configuration/route/rule_action/#tls_spoof) /
+[`tls_spoof_method`](/configuration/route/rule_action/#tls_spoof_method)
+to route rule actions for per-rule TLS spoofing without outbound TLS settings.
 
 #### 1.14.0-alpha.20
 

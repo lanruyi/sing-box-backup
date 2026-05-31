@@ -8,6 +8,7 @@ require (
 	github.com/caddyserver/certmagic v0.25.3-0.20260421143802-60d9d8b415d6
 	github.com/caddyserver/zerossl v0.1.5
 	github.com/coder/websocket v1.8.14
+	github.com/creack/pty v1.1.24
 	github.com/cretz/bine v0.2.0
 	github.com/database64128/tfo-go/v2 v2.3.2
 	github.com/go-chi/chi/v5 v5.2.5
@@ -35,7 +36,7 @@ require (
 	github.com/sagernet/cronet-go v0.0.0-20260516035203-b3eec8134aec
 	github.com/sagernet/cronet-go/all v0.0.0-20260516035203-b3eec8134aec
 	github.com/sagernet/fswatch v0.1.2
-	github.com/sagernet/gliderssh v0.3.4-0.20260526130713-7b0a0697b4fd
+	github.com/sagernet/gliderssh v0.3.4-0.20260531100337-2194faca5648
 	github.com/sagernet/gomobile v0.1.12
 	github.com/sagernet/gvisor v0.0.0-20250811.0-sing-box-mod.1
 	github.com/sagernet/quic-go v0.59.0-sing-box-mod.4
@@ -79,7 +80,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/coreos/go-iptables v0.7.1-0.20240112124308-65c67c9f46e6 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/database64128/netx-go v0.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dblohm7/wingoes v0.0.0-20240119213807-a09d6be7affa // indirect

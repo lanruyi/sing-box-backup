@@ -33,6 +33,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+const APIVersion = 1
+
 var _ StartedServiceServer = (*StartedService)(nil)
 
 type StartedService struct {
@@ -114,6 +116,13 @@ func NewStartedService(options ServiceOptions) *StartedService {
 	s.clashModeObserver = observable.NewObserver(s.clashModeSubscriber, 1)
 	s.connectionEventObserver = observable.NewObserver(s.connectionEventSubscriber, 64)
 	return s
+}
+
+func (s *StartedService) GetVersion(ctx context.Context, empty *emptypb.Empty) (*Version, error) {
+	return &Version{
+		Version:    C.Version,
+		ApiVersion: APIVersion,
+	}, nil
 }
 
 func (s *StartedService) resetLogs() {

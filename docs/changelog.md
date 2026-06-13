@@ -2,6 +2,10 @@
 icon: material/alert-decagram
 ---
 
+#### 1.14.0-alpha.31
+
+* Fixes and improvements
+
 #### 1.14.0-alpha.30
 
 * Introducing sing-box API service **1**

@@ -29,11 +29,25 @@ type USBSharedDeviceIterator interface {
 	HasNext() bool
 }
 
+const (
+	USBDeviceStateIdle int32 = iota
+	USBDeviceStateAttached
+	USBDeviceStateUnavailable
+)
+
+const (
+	USBBackendUnspecified int32 = iota
+	USBBackendLinuxSysfs
+	USBBackendDynamic
+	USBBackendDarwinIOKit
+	USBBackendWindowsVBoxUSB
+)
+
 type USBSharedDevice struct {
 	BusID              string
 	StableID           string
-	Backend            string
-	State              string
+	Backend            int32
+	State              int32
 	DeviceID           string
 	BusNum             int32
 	DevNum             int32
@@ -107,8 +121,8 @@ func usbSharedDeviceFromGRPC(device *daemon.USBSharedDevice) *USBSharedDevice {
 	return &USBSharedDevice{
 		BusID:              device.GetBusId(),
 		StableID:           device.GetStableId(),
-		Backend:            device.GetBackend(),
-		State:              device.GetState(),
+		Backend:            int32(device.GetBackend()),
+		State:              int32(device.GetState()),
 		DeviceID:           descriptor.GetDeviceId(),
 		BusNum:             int32(descriptor.GetBusNum()),
 		DevNum:             int32(descriptor.GetDevNum()),

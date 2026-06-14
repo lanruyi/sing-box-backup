@@ -260,8 +260,8 @@ func usbSharedDevicesToProto(devices []usbip.ControlDeviceInfo) []*USBSharedDevi
 			},
 			BusId:    device.BusID,
 			StableId: device.StableID,
-			Backend:  device.Backend,
-			State:    device.State,
+			Backend:  USBBackend(device.Backend),
+			State:    USBDeviceState(device.State),
 		})
 	}
 	return out

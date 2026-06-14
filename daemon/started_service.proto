@@ -499,6 +499,20 @@ message USBSharedDevice {
   USBDeviceDescriptor descriptor = 1;
   string busId = 2;
   string stableId = 3;
-  string backend = 4;
-  string state = 5;
+  USBBackend backend = 4;
+  USBDeviceState state = 5;
+}
+
+enum USBDeviceState {
+  USB_DEVICE_STATE_IDLE = 0;
+  USB_DEVICE_STATE_ATTACHED = 1;
+  USB_DEVICE_STATE_UNAVAILABLE = 2;
+}
+
+enum USBBackend {
+  USB_BACKEND_UNSPECIFIED = 0;
+  USB_BACKEND_LINUX_SYSFS = 1;
+  USB_BACKEND_DYNAMIC = 2;
+  USB_BACKEND_DARWIN_IOKIT = 3;
+  USB_BACKEND_WINDOWS_VBOXUSB = 4;
 }

@@ -150,7 +150,11 @@ func (e *Endpoint) Start(resolve bool) error {
 	var bind conn.Bind
 	wgListener, isWgListener := common.Cast[dialer.WireGuardListener](e.options.Dialer)
 	if isWgListener {
-		bind = conn.NewStdNetBind(wgListener.WireGuardControl())
+		stdBind := conn.NewStdNetBind(wgListener.WireGuardControl())
+		if e.options.ListenPort == 0 && len(e.peers) == 1 && e.peers[0].endpoint.IsValid() {
+			stdBind.(*conn.StdNetBind).SetSinglePeerMode()
+		}
+		bind = stdBind
 	} else {
 		var (
 			isConnect   bool

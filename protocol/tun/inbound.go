@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -98,7 +99,6 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 
 	platformInterface := service.FromContext[adapter.PlatformInterface](ctx)
 	tunMTU := options.MTU
-	enableGSO := C.IsLinux && options.Stack == "gvisor" && platformInterface == nil && tunMTU > 0 && tunMTU < 49152
 	if tunMTU == 0 {
 		if platformInterface != nil && platformInterface.UnderNetworkExtension() {
 			// In Network Extension, when MTU exceeds 4064 (4096-UTUN_IF_HEADROOM_SIZE), the performance of tun will drop significantly, which may be a system bug.
@@ -109,6 +109,10 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		} else {
 			tunMTU = 65535
 		}
+	}
+	var enableGSO bool
+	if C.IsLinux && platformInterface == nil {
+		enableGSO = (options.Stack == "gvisor" && tunMTU < 49152)
 	}
 	var udpTimeout time.Duration
 	if options.UDPTimeout != 0 {
@@ -177,7 +181,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		excludeMACAddress = append(excludeMACAddress, mac)
 	}
 	networkManager := service.FromContext[adapter.NetworkManager](ctx)
-	multiPendingPackets := C.IsDarwin && ((options.Stack == "gvisor" && tunMTU < 32768) || (options.Stack != "gvisor" && options.MTU <= 9000))
+	multiPendingPackets := C.IsDarwin && ((options.Stack == "gvisor" && tunMTU < 32768) || (options.Stack != "gvisor" && tunMTU <= 9000))
 	inbound := &Inbound{
 		tag:            tag,
 		ctx:            ctx,
@@ -319,6 +323,22 @@ func (t *Inbound) Start(stage adapter.StartStage) error {
 			t.dnsHijackAddress = append(inet4DNSAddress, inet6DNSAddress...)
 		}
 	case adapter.StartStateStart:
+		if t.platformInterface == nil &&
+			((C.IsLinux && !t.tunOptions.GSO) || (C.IsDarwin && !t.tunOptions.EXP_MultiPendingPackets)) {
+			endpointManager := service.FromContext[adapter.EndpointManager](t.ctx)
+			if endpointManager != nil {
+				for _, managedEndpoint := range endpointManager.Endpoints() {
+					if _, isFlowOutbound := managedEndpoint.(adapter.FlowOutbound); isFlowOutbound {
+						if C.IsLinux {
+							t.tunOptions.GSO = true
+						} else {
+							t.tunOptions.EXP_MultiPendingPackets = true
+						}
+						break
+					}
+				}
+			}
+		}
 		if C.IsAndroid && t.platformInterface == nil {
 			t.tunOptions.BuildAndroidRules(t.networkManager.PackageManager())
 		}
@@ -459,8 +479,11 @@ func (t *Inbound) Close() error {
 	)
 }
 
-func (t *Inbound) JudgeFlow(network uint8, source netip.AddrPort, destination netip.AddrPort) tun.FlowVerdict {
-	return adapter.JudgeFlow(t.router, t.tag, C.TypeTun, network, source, destination)
+func (t *Inbound) JudgeFlow(network uint8, source netip.AddrPort, destination netip.AddrPort, firstPacket []byte) tun.FlowVerdict {
+	if slices.Contains(t.dnsHijackAddress, destination.Addr()) {
+		return tun.FlowVerdict{Action: tun.ActionAccept}
+	}
+	return adapter.JudgeFlow(t.router, t.tag, C.TypeTun, network, source, destination, firstPacket)
 }
 
 func (t *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {
@@ -470,10 +493,8 @@ func (t *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.S
 	metadata.InboundType = C.TypeTun
 	metadata.Source = source
 	metadata.Destination = destination
-	for _, dnsHijackAddress := range t.dnsHijackAddress {
-		if destination.Addr == dnsHijackAddress {
-			metadata.Protocol = C.ProtocolDNS
-		}
+	if slices.Contains(t.dnsHijackAddress, destination.Addr) {
+		metadata.Protocol = C.ProtocolDNS
 	}
 	if metadata.Protocol == C.ProtocolDNS {
 		t.logger.InfoContext(ctx, "inbound DNS connection from ", metadata.Source)
@@ -507,8 +528,8 @@ func (t *Inbound) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn, 
 
 type autoRedirectHandler Inbound
 
-func (t *autoRedirectHandler) JudgeFlow(network uint8, source netip.AddrPort, destination netip.AddrPort) tun.FlowVerdict {
-	return (*Inbound)(t).JudgeFlow(network, source, destination)
+func (t *autoRedirectHandler) JudgeFlow(network uint8, source netip.AddrPort, destination netip.AddrPort, firstPacket []byte) tun.FlowVerdict {
+	return (*Inbound)(t).JudgeFlow(network, source, destination, firstPacket)
 }
 
 func (t *autoRedirectHandler) NewConnectionEx(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) {

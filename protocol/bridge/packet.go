@@ -52,14 +52,6 @@ func addressAt(base netip.Addr, offset uint32) netip.Addr {
 	return addr
 }
 
-func (b *backendBase) egressMTU(egress string) int {
-	iface, err := b.networkManager.InterfaceFinder().ByName(egress)
-	if err != nil || iface.MTU < 576 || iface.MTU > bridgeTunMTU {
-		return bridgeTunMTU
-	}
-	return iface.MTU
-}
-
 func fixReturnChecksum(packet []byte) {
 	switch header.IPVersion(packet) {
 	case header.IPv4Version:

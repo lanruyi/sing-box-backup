@@ -43,6 +43,9 @@ type backendBase struct {
 	forwardingRestore []sysctlState
 	unregister        func()
 
+	session       adapter.BridgeSession
+	currentEgress string
+
 	closeOnce sync.Once
 	closed    chan struct{}
 	readDone  chan struct{}
@@ -93,6 +96,31 @@ func (b *backendBase) DetachReturn(returnPath tun.Return) error {
 	}
 	b.returnPaths = returnPaths
 	return nil
+}
+
+func (b *backendBase) syncSessionEgress() {
+	b.egressAccess.Lock()
+	defer b.egressAccess.Unlock()
+	select {
+	case <-b.closed:
+		return
+	default:
+	}
+	egress := b.resolveEgress()
+	if egress == b.currentEgress {
+		return
+	}
+	err := b.session.SetEgress(egress)
+	if err != nil {
+		b.logger.Debug(E.Cause(err, "apply bridge egress ", egress))
+		return
+	}
+	b.currentEgress = egress
+	if egress == "" {
+		b.logger.Debug("bridge egress unavailable, dropping forwarded traffic")
+	} else {
+		b.logger.Debug("bridge egress ", egress)
+	}
 }
 
 func (b *backendBase) resolveEgress() string {

@@ -8,9 +8,14 @@ icon: material/new-box
 
 !!! quote ""
 
-    Only supported on Linux and macOS, and requires privileges.
+    Requires privileges. Supported on Linux, macOS, rooted Android, and jailbroken iOS.
 
-`bridge` only accepts L3 connections (TCP, UDP and ICMP) forwarded via the `route` action in
+    For graphical clients: on macOS, only available in the standalone version and requires the
+    Root Helper; on Android, requires root permission; on iOS, requires jailbreak.
+
+`bridge` is the L3 counterpart of the `direct` outbound: it forwards L3 connections
+(TCP, UDP and ICMP) directly out of a network interface. Route L3 traffic to it from a TUN
+or other L3 endpoints via the `route` action in
 [Pre-match](/configuration/shared/pre-match/); L4 connections will be rejected.
 
 ### Structure

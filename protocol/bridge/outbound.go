@@ -12,7 +12,6 @@ import (
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-tun"
 	E "github.com/sagernet/sing/common/exceptions"
-	"github.com/sagernet/sing/common/logger"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
@@ -35,8 +34,6 @@ type Backend interface {
 
 type Outbound struct {
 	outbound.Adapter
-	ctx     context.Context
-	logger  logger.ContextLogger
 	backend Backend
 }
 
@@ -48,8 +45,6 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	}
 	return &Outbound{
 		Adapter: outbound.NewAdapter(C.TypeBridge, tag, []string{N.NetworkTCP, N.NetworkUDP, N.NetworkICMP}, nil),
-		ctx:     ctx,
-		logger:  logger,
 		backend: outboundBackend,
 	}, nil
 }

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	bridgeTunMTU         = 1500
+	bridgeTunMTU         = 0xffff
 	maxPacketLength      = 0xffff
 	bridgeMaxInstances   = 254
 	bridgeWriteBatchSize = 32

@@ -65,12 +65,12 @@ func (o *Outbound) Close() error {
 	return o.backend.Close()
 }
 
-func (o *Outbound) PreferredDomain(domain string) bool {
+func (o *Outbound) PreferredDomain(metadata *adapter.InboundContext, domain string) bool {
 	return false
 }
 
-func (o *Outbound) PreferredAddress(address netip.Addr) bool {
-	return !o.isLocalDestination(address)
+func (o *Outbound) PreferredAddress(metadata *adapter.InboundContext, address netip.Addr) bool {
+	return metadata.PreMatch && !o.isLocalDestination(address)
 }
 
 func (o *Outbound) PreMatchFlow(network string, destination netip.Addr) adapter.PreMatchAction {

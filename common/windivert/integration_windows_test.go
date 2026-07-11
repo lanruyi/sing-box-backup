@@ -3,8 +3,11 @@
 package windivert
 
 import (
+	"bytes"
 	"errors"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -65,6 +68,94 @@ func TestIntegrationRecvAbortsOnClose(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("Recv did not unblock within 3s after Close")
 	}
+}
+
+func cachedDriverPath(t *testing.T) string {
+	t.Helper()
+	base, err := os.UserCacheDir()
+	require.NoError(t, err)
+	return filepath.Join(base, "sing-box", "windivert", "v"+AssetVersion, driverSysName())
+}
+
+// The driver does not unload when the last handle closes: it stays running
+// (and the memory manager keeps its backing image write-locked) until
+// explicitly stopped, like `sc stop WinDivert`. The install-time
+// DeleteService mark then removes the record once the last SCM handle
+// closes.
+func stopDriver(t *testing.T) {
+	t.Helper()
+	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
+	require.NoError(t, err)
+	defer windows.CloseServiceHandle(manager)
+	serviceNameW, err := windows.UTF16PtrFromString(driverServiceName)
+	require.NoError(t, err)
+	service, err := windows.OpenService(manager, serviceNameW, windows.SERVICE_STOP)
+	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
+		return
+	}
+	require.NoError(t, err)
+	defer windows.CloseServiceHandle(service)
+	var status windows.SERVICE_STATUS
+	err = windows.ControlService(service, windows.SERVICE_CONTROL_STOP, &status)
+	if err != nil && !errors.Is(err, windows.ERROR_SERVICE_NOT_ACTIVE) {
+		require.NoError(t, err)
+	}
+}
+
+// Image unlock can lag the SCM stop by a moment, so retry the write.
+func plantTamperedDriver(t *testing.T, target string, planted []byte) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
+	require.Eventually(t, func() bool {
+		return os.WriteFile(target, planted, 0o644) == nil
+	}, 10*time.Second, 100*time.Millisecond, "driver image still locked after service stop")
+}
+
+// A foreign .sys planted in the user-writable cache must never reach
+// StartService: the install path has to detect the mismatch against the
+// embedded asset and repair the file before handing it to SCM.
+func TestIntegrationTamperedCacheRepaired(t *testing.T) {
+	// Open/close once so a working install is the baseline, then stop the
+	// driver so the cached file is writable for tampering.
+	h := openHandle(t, nil, FlagSendOnly)
+	require.NoError(t, h.Close())
+	stopDriver(t)
+
+	target := cachedDriverPath(t)
+	plantTamperedDriver(t, target, []byte("planted payload, not the WinDivert driver"))
+
+	h = openHandle(t, nil, FlagSendOnly)
+	require.NoError(t, h.Close())
+
+	content, err := os.ReadFile(target)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(content, sysBytes), "cached driver was not repaired to the embedded asset")
+}
+
+// The verified handle must lock the file against writers and renames until
+// install completes; without this, the file could be swapped between
+// verification and the kernel mapping it.
+func TestIntegrationDriverFileLockedWhileHeld(t *testing.T) {
+	target := cachedDriverPath(t)
+	// Stop the driver so the kernel image lock is gone and the failures
+	// asserted below can only come from the handle extractVerified holds.
+	stopDriver(t)
+	plantTamperedDriver(t, target, sysBytes)
+
+	sysPath, sysFile, err := extractVerified()
+	require.NoError(t, err)
+	defer sysFile.Close()
+
+	writeErr := os.WriteFile(sysPath, []byte("overwrite attempt"), 0o644)
+	require.Error(t, writeErr)
+	require.True(t, errors.Is(writeErr, windows.ERROR_SHARING_VIOLATION),
+		"expected sharing violation, got %v", writeErr)
+
+	evil := sysPath + ".evil"
+	require.NoError(t, os.WriteFile(evil, []byte("replacement attempt"), 0o644))
+	defer os.Remove(evil)
+	renameErr := os.Rename(evil, sysPath)
+	require.Error(t, renameErr)
 }
 
 // Two concurrent Open calls must both succeed: the first wins the driver

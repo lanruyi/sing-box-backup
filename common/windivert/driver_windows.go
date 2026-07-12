@@ -138,7 +138,8 @@ func installDriver() error {
 			return nil
 		}
 		retryable := errors.Is(err, windows.ERROR_SERVICE_MARKED_FOR_DELETE) ||
-			errors.Is(err, windows.ERROR_SERVICE_DISABLED)
+			errors.Is(err, windows.ERROR_SERVICE_DISABLED) ||
+			errors.Is(err, windows.ERROR_OBJECT_ALREADY_EXISTS)
 		if !retryable || attempt >= 20 {
 			return err
 		}

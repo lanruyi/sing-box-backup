@@ -20,42 +20,71 @@ func (h *managedHandler) ServiceStop() error {
 	if h.daemon.closed {
 		return os.ErrClosed
 	}
-	options, err := loadStartOptions()
+	ownerUserID, err := loadOwner()
 	if err != nil {
 		return err
 	}
-	return h.daemon.stopServiceLocked(options.OwnerUserID)
+	return h.daemon.stopServiceLocked(ownerUserID)
 }
 
 func (h *managedHandler) ServiceReload() error {
 	if h.daemon.closed {
 		return os.ErrClosed
 	}
-	configContent, err := loadServiceConfig()
+	ownerUserID, err := loadOwner()
 	if err != nil {
 		return err
 	}
-	options, err := loadStartOptions()
+	configContent, err := loadServiceConfig(ownerUserID)
 	if err != nil {
 		return err
 	}
-	err = h.daemon.startService(configContent, options)
+	options, err := loadStartOptions(ownerUserID)
+	if err != nil {
+		return err
+	}
+	err = h.daemon.startServiceLocked(ownerUserID, configContent, options)
 	if err != nil {
 		return err
 	}
 	options.WasRunning = true
-	return saveStartOptions(options)
+	return saveStartOptions(ownerUserID, options)
 }
 
 func (h *managedHandler) SystemProxyStatus() (*daemon.SystemProxyStatus, error) {
-	return &daemon.SystemProxyStatus{}, nil
+	if h.daemon.platform == nil {
+		return &daemon.SystemProxyStatus{}, nil
+	}
+	return h.daemon.platform.SystemProxyStatus()
 }
 
 func (h *managedHandler) SetSystemProxyEnabled(enabled bool) error {
-	if !enabled {
-		return nil
+	if h.daemon.platform == nil {
+		if !enabled {
+			return nil
+		}
+		return status.Error(codes.FailedPrecondition, "the system proxy is not available")
 	}
-	return status.Error(codes.FailedPrecondition, "the system proxy is not available")
+	ownerUserID, err := loadOwner()
+	if err != nil {
+		return err
+	}
+	options, err := loadStartOptions(ownerUserID)
+	if err != nil {
+		return err
+	}
+	previousEnabled := options.systemProxyEnabled()
+	err = h.daemon.platform.SetSystemProxyEnabled(enabled)
+	if err != nil {
+		return err
+	}
+	options.SystemProxyEnabled = &enabled
+	err = saveStartOptions(ownerUserID, options)
+	if err != nil {
+		rollbackError := h.daemon.platform.SetSystemProxyEnabled(previousEnabled)
+		return E.Errors(err, rollbackError)
+	}
+	return nil
 }
 
 func (h *managedHandler) TriggerNativeCrash() error {

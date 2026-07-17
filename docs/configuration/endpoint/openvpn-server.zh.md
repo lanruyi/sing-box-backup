@@ -2,12 +2,6 @@
 
 !!! question "自 sing-box 1.14.0 起"
 
-!!! info "构建标签"
-
-    OpenVPN 端点需要 `with_openvpn` 构建标签。
-
-    禁用 `system` 时，内部网络栈还需要 `with_gvisor` 构建标签。
-
 ## 结构
 
 ```json
@@ -79,8 +73,6 @@
 需要特权且不能与已有系统接口冲突。
 
 如果禁用，sing-box 将使用内部网络栈。
-
-禁用时需要 `with_gvisor` 构建标签。
 
 ### name
 

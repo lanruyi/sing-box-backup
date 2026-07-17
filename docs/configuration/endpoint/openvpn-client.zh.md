@@ -2,12 +2,6 @@
 
 !!! question "自 sing-box 1.14.0 起"
 
-!!! info "构建标签"
-
-    OpenVPN endpoint 需要 `with_openvpn` 构建标签。
-
-    当禁用 `system` 时，内部网络栈还需要 `with_gvisor` 构建标签。
-
 ## 结构
 
 ```json
@@ -479,8 +473,6 @@ OpenVPN TLS 重新协商间隔。
 需要权限，且不能与现有系统接口冲突。
 
 禁用时，sing-box 使用内部网络栈。
-
-禁用时需要 `with_gvisor` 构建标签。
 
 ### name
 

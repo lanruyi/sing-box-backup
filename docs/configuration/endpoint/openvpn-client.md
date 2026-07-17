@@ -2,12 +2,6 @@
 
 !!! question "Since sing-box 1.14.0"
 
-!!! info "Build tags"
-
-    OpenVPN endpoints require the `with_openvpn` build tag.
-
-    When `system` is disabled, the internal network stack also requires the `with_gvisor` build tag.
-
 ## Structure
 
 ```json
@@ -479,8 +473,6 @@ Use a system interface.
 Requires privilege and cannot conflict with existing system interfaces.
 
 If disabled, sing-box uses the internal network stack.
-
-Requires the `with_gvisor` build tag when disabled.
 
 ### name
 

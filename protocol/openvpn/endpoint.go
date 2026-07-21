@@ -212,7 +212,6 @@ func configurationFromClientEvent(event ovpn.TunnelConfigurationEvent, logger lo
 					Gateway: configuration.VPNGateway,
 					Metric:  configuration.RouteMetric,
 				})
-				hasInet4DefaultRoute = true
 			}
 		}
 		if hasOpenVPNFlag(configuration.RedirectGatewayFlags, "ipv6") && !hasInet6DefaultRoute {

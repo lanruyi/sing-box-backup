@@ -467,15 +467,12 @@ func (f *dnsEvaluatedFuture) view() *mDNS.Msg {
 }
 
 type dnsArmedRule struct {
-	ruleIndex int
-	rule      *R.DefaultDNSRule
-	future    *dnsEvaluatedFuture
-	options   adapter.DNSQueryOptions
-}
-
-type dnsRuleWithResponseBindings interface {
-	MatchResponseTags() []string
-	MatchResponseAnonymous() bool
+	ruleIndex       int
+	rule            adapter.DNSRule
+	futures         []*dnsEvaluatedFuture
+	anonymousFuture *dnsEvaluatedFuture
+	bindsAnonymous  bool
+	options         adapter.DNSQueryOptions
 }
 
 type dnsPendingExchange struct {
@@ -569,43 +566,55 @@ func (r *Router) walkDNSRules(ctx context.Context, rules []adapter.DNSRule, mess
 	}
 	for ; state.ruleIndex < len(rules); state.ruleIndex++ {
 		currentRule := rules[state.ruleIndex]
-		var hasBindings bool
-		if bindingRule, withBindings := currentRule.(dnsRuleWithResponseBindings); withBindings {
-			hasBindings = len(bindingRule.MatchResponseTags()) > 0 || bindingRule.MatchResponseAnonymous()
-			if hasBindings {
-				r.settleDNSFutures(ctx, message, state)
-				if defaultRule, isDefault := currentRule.(*R.DefaultDNSRule); isDefault && defaultRule.Racing() {
-					future := state.anonymousFuture
-					if responseTag := defaultRule.MatchResponseTag(); responseTag != "" {
-						future = state.namedFutures[responseTag]
-					}
+		hasBindings := len(currentRule.MatchResponseTags()) > 0 || currentRule.MatchResponseAnonymous()
+		if hasBindings {
+			r.settleDNSFutures(ctx, message, state)
+			if currentRule.Race() {
+				var (
+					pendingFutures  []*dnsEvaluatedFuture
+					anonymousFuture *dnsEvaluatedFuture
+				)
+				for _, responseTag := range currentRule.MatchResponseTags() {
+					future := state.namedFutures[responseTag]
 					if future != nil && !future.resolved() {
-						r.logger.DebugContext(ctx, "armed[", state.ruleIndex, "] ", currentRule, " => ", currentRule.Action())
-						state.armedRules = append(state.armedRules, &dnsArmedRule{
-							ruleIndex: state.ruleIndex,
-							rule:      defaultRule,
-							future:    future,
-							options:   state.effectiveOptions,
-						})
-						continue
+						pendingFutures = append(pendingFutures, future)
 					}
-				} else {
-					var awaitFuture *dnsEvaluatedFuture
-					for _, responseTag := range bindingRule.MatchResponseTags() {
-						future := state.namedFutures[responseTag]
-						if future != nil && !future.resolved() {
-							awaitFuture = future
-							break
-						}
+				}
+				bindsAnonymous := currentRule.MatchResponseAnonymous()
+				if bindsAnonymous {
+					anonymousFuture = state.anonymousFuture
+					if anonymousFuture != nil && !anonymousFuture.resolved() {
+						pendingFutures = append(pendingFutures, anonymousFuture)
 					}
-					if awaitFuture == nil && bindingRule.MatchResponseAnonymous() {
-						if future := state.anonymousFuture; future != nil && !future.resolved() {
-							awaitFuture = future
-						}
+				}
+				if len(pendingFutures) > 0 {
+					r.logger.DebugContext(ctx, "armed[", state.ruleIndex, "] ", currentRule, " => ", currentRule.Action())
+					state.armedRules = append(state.armedRules, &dnsArmedRule{
+						ruleIndex:       state.ruleIndex,
+						rule:            currentRule,
+						futures:         pendingFutures,
+						anonymousFuture: anonymousFuture,
+						bindsAnonymous:  bindsAnonymous,
+						options:         state.effectiveOptions,
+					})
+					continue
+				}
+			} else {
+				var awaitFuture *dnsEvaluatedFuture
+				for _, responseTag := range currentRule.MatchResponseTags() {
+					future := state.namedFutures[responseTag]
+					if future != nil && !future.resolved() {
+						awaitFuture = future
+						break
 					}
-					if awaitFuture != nil {
-						return exchangeWithRulesResult{}, &dnsWalkSuspension{await: awaitFuture}
+				}
+				if awaitFuture == nil && currentRule.MatchResponseAnonymous() {
+					if future := state.anonymousFuture; future != nil && !future.resolved() {
+						awaitFuture = future
 					}
+				}
+				if awaitFuture != nil {
+					return exchangeWithRulesResult{}, &dnsWalkSuspension{await: awaitFuture}
 				}
 			}
 		}
@@ -650,8 +659,8 @@ func (r *Router) walkDNSRules(ctx context.Context, rules []adapter.DNSRule, mess
 			if len(state.armedRules) > 0 {
 				return exchangeWithRulesResult{}, &dnsWalkSuspension{drain: true}
 			}
-			if defaultRule, isDefault := currentRule.(*R.DefaultDNSRule); isDefault && defaultRule.MatchResponseTag() != "" {
-				namedResponse := state.namedResponses[defaultRule.MatchResponseTag()]
+			if responseTag := currentRule.MatchResponseTag(); responseTag != "" {
+				namedResponse := state.namedResponses[responseTag]
 				if namedResponse == nil {
 					return exchangeWithRulesResult{
 						err: E.New(dnsRespondMissingResponseMessage),
@@ -659,7 +668,7 @@ func (r *Router) walkDNSRules(ctx context.Context, rules []adapter.DNSRule, mess
 				}
 				return exchangeWithRulesResult{
 					response:  namedResponse,
-					transport: state.namedTransports[defaultRule.MatchResponseTag()],
+					transport: state.namedTransports[responseTag],
 				}, nil
 			}
 			if !hasBindings {
@@ -777,14 +786,25 @@ func (r *Router) sweepArmedDNSRules(ctx context.Context, message *mDNS.Msg, stat
 	metadata := adapter.ContextFrom(ctx)
 	for index := 0; index < len(state.armedRules); {
 		armed := state.armedRules[index]
-		if !armed.future.resolved() {
+		ready := true
+		for _, future := range armed.futures {
+			if !future.resolved() {
+				ready = false
+				break
+			}
+		}
+		if !ready {
 			index++
 			continue
 		}
 		state.armedRules = append(state.armedRules[:index], state.armedRules[index+1:]...)
 		metadata.ResetRuleCache()
-		if armed.rule.MatchResponseTag() == "" {
-			metadata.DNSResponse = armed.future.view()
+		if armed.bindsAnonymous {
+			if armed.anonymousFuture != nil {
+				metadata.DNSResponse = armed.anonymousFuture.view()
+			} else {
+				metadata.DNSResponse = nil
+			}
 		} else {
 			metadata.DNSResponse = state.anonymousResponse()
 		}
@@ -796,7 +816,20 @@ func (r *Router) sweepArmedDNSRules(ctx context.Context, message *mDNS.Msg, stat
 		r.logRuleMatch(ctx, armed.ruleIndex, armed.rule)
 		switch action := armed.rule.Action().(type) {
 		case *R.RuleActionRespond:
-			response := armed.future.view()
+			var (
+				response  *mDNS.Msg
+				transport adapter.DNSTransport
+			)
+			if responseTag := armed.rule.MatchResponseTag(); responseTag != "" {
+				response = state.namedResponses[responseTag]
+				transport = state.namedTransports[responseTag]
+			} else if armed.anonymousFuture != nil {
+				response = armed.anonymousFuture.view()
+				transport = armed.anonymousFuture.transport
+			} else if state.anonymousFuture != nil {
+				response = state.anonymousResponse()
+				transport = state.anonymousFuture.transport
+			}
 			if response == nil {
 				return exchangeWithRulesResult{
 					err: E.New(dnsRespondMissingResponseMessage),
@@ -804,7 +837,7 @@ func (r *Router) sweepArmedDNSRules(ctx context.Context, message *mDNS.Msg, stat
 			}
 			return exchangeWithRulesResult{
 				response:  response,
-				transport: armed.future.transport,
+				transport: transport,
 			}, nil, true
 		case *R.RuleActionDNSRoute:
 			queryOptions := armed.options
@@ -1443,7 +1476,7 @@ func validateLegacyDNSModeDisabledRules(router adapter.Router, rules []option.DN
 	var (
 		warnings               []string
 		seenAnonymousEvaluate  bool
-		seenRacing             bool
+		seenRace               bool
 		definedTags            = make(map[string]bool)
 		definedTagOrder        []string
 		referencedTags         = make(map[string]bool)
@@ -1455,11 +1488,11 @@ func validateLegacyDNSModeDisabledRules(router adapter.Router, rules []option.DN
 		if err != nil {
 			return nil, E.Cause(err, "validate dns rule[", i, "]")
 		}
-		if dnsRuleActionSpeculative(rule) && !seenRacing {
-			warnings = append(warnings, F.ToString("dns rule[", i, "]: `speculative` has no effect without a preceding `racing` rule"))
+		if dnsRuleActionSpeculative(rule) && !seenRace {
+			warnings = append(warnings, F.ToString("dns rule[", i, "]: `speculative` has no effect without a preceding `race` rule"))
 		}
-		if dnsRuleRacing(rule) {
-			seenRacing = true
+		if dnsRuleRace(rule) {
+			seenRace = true
 		}
 		if use.needsAnonymous {
 			if !seenAnonymousEvaluate {
@@ -1586,7 +1619,7 @@ func validateLegacyDNSModeDisabledDefaultRule(router adapter.Router, rule option
 }
 
 func dnsRuleActionDisablesLegacyDNSMode(action option.DNSRuleAction) bool {
-	if action.Racing {
+	if action.Race {
 		return true
 	}
 	switch action.Action {
@@ -1660,12 +1693,12 @@ func dnsRuleActionSpeculative(rule option.DNSRule) bool {
 	}
 }
 
-func dnsRuleRacing(rule option.DNSRule) bool {
+func dnsRuleRace(rule option.DNSRule) bool {
 	switch rule.Type {
 	case "", C.RuleTypeDefault:
-		return rule.DefaultOptions.Racing
+		return rule.DefaultOptions.Race
 	case C.RuleTypeLogical:
-		return rule.LogicalOptions.Racing
+		return rule.LogicalOptions.Race
 	default:
 		return false
 	}

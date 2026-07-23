@@ -15,10 +15,7 @@ icon: material/alert-decagram
     :material-plus: [response_extra](#response_extra)  
     :material-plus: [package_name_regex](#package_name_regex)  
     :material-alert: [ip_version](#ip_version)  
-    :material-alert: [query_type](#query_type)  
-    :material-plus: [racing](#racing)  
-    :material-plus: [domain_label_count](#domain_label_count)  
-    :material-plus: [search_domain_available](#search_domain_available)
+    :material-alert: [query_type](#query_type)
 
 !!! quote "Changes in sing-box 1.13.0"
 
@@ -102,7 +99,6 @@ icon: material/alert-decagram
         "domain_regex": [
           "^stun\\..+"
         ],
-        "domain_label_count": 1,
         "source_ip_cidr": [
           "10.0.0.0/24",
           "192.168.0.1"
@@ -175,9 +171,6 @@ icon: material/alert-decagram
           "local",
           "ts-dns"
         ],
-        "search_domain_available": [
-          "ts-dns"
-        ],
         "wifi_ssid": [
           "My WIFI"
         ],
@@ -190,7 +183,6 @@ icon: material/alert-decagram
         ],
         "rule_set_ip_cidr_match_source": false,
         "match_response": false,
-        "racing": false,
         "ip_cidr": [
           "10.0.0.0/24",
           "192.168.0.1"
@@ -327,14 +319,6 @@ Match domain using keyword.
 #### domain_regex
 
 Match domain using regular expression.
-
-#### domain_label_count
-
-!!! question "Since sing-box 1.14.0"
-
-Match the number of labels in the query name.
-
-`printer` has one label; `printer.corp.example.com` has four.
 
 #### geosite
 
@@ -523,31 +507,14 @@ Match source device hostname from DHCP leases.
 
 Match specified DNS servers' preferred domains.
 
-| Type          | Match                                                                                               |
-|---------------|-----------------------------------------------------------------------------------------------------|
-| `hosts`       | Match predefined entries and entries in hosts files                                                 |
-| `local`       | Match hosts entries, neighbor-resolved hosts, mDNS local domains, and system search domain suffixes |
-| `dhcp`        | Match search domain suffixes acquired via DHCP                                                      |
-| `mdns`        | Match mDNS local domains (`*.local.` and IPv4/IPv6 link-local reverse zones)                        |
-| `tailscale`   | Match MagicDNS hosts, DNS route suffixes, and search domain suffixes                                |
-| `openvpn`     | Match split DNS and search domain suffixes pushed by the VPN server                                         |
-| `openconnect` | Match split DNS and search domain suffixes pushed by the VPN server                                         |
-| `resolved`    | Match split DNS and search domain suffixes from systemd-resolved links                                      |
-
-#### search_domain_available
-
-!!! question "Since sing-box 1.14.0"
-
-Match if the specified DNS servers currently have at least one search domain.
-
-Supported DNS server types: `local`, `dhcp`, `tailscale`, `openvpn`, `openconnect`, `resolved`.
-
-Unlike `preferred_by`, this item does not check the query name. Combine it with
-[`domain_label_count`](#domain_label_count) to route unqualified name queries to a server
-that can expand them, only while the server actually holds search domains.
-
-For `tailscale`, `openvpn` and `openconnect` servers, expanding single-label queries
-also requires `accept_search_domain` to be enabled on the server.
+| Type          | Match                                                                        |
+|---------------|------------------------------------------------------------------------------|
+| `hosts`       | Match predefined entries and entries in hosts files                          |
+| `local`       | Match hosts entries, neighbor-resolved hosts, and mDNS local domains         |
+| `mdns`        | Match mDNS local domains (`*.local.` and IPv4/IPv6 link-local reverse zones) |
+| `tailscale`   | Match MagicDNS hosts and DNS route suffixes                                  |
+| `openconnect` | Match split DNS and search domains pushed by the VPN server                  |
+| `resolved`    | Match split DNS and search domains from systemd-resolved links               |
 
 #### wifi_ssid
 
@@ -597,39 +564,12 @@ instead of only matching the original query.
 
 `true` or the `tag` of an `evaluate` action: `true` matches against the response of the latest
 `evaluate` action without `tag`; a tag matches against the response of the `evaluate` action with the tag.
-If the referenced query failed, or its `evaluate` rule did not run, response conditions do not match
-(a rule with `invert` enabled therefore matches).
-
-Since `evaluate` queries are sent asynchronously, a rule with `match_response` waits for the
-referenced query to complete before matching; enable [`racing`](#racing) to judge the response
-as soon as it arrives instead.
 
 The evaluated response can also be returned directly by a later [`respond`](/configuration/dns/rule_action/#respond) action;
 in a rule with a `match_response` tag, `respond` returns the tagged response.
 
 Required for Response Match Fields (`response_rcode`, `response_answer`, `response_ns`, `response_extra`).
 Also required for `ip_cidr`, `ip_is_private`, and `ip_accept_any` when used with `evaluate` or Response Match Fields.
-
-#### racing
-
-!!! question "Since sing-box 1.14.0"
-
-Do not wait for the query referenced by `match_response`: the rule is evaluated when its response
-arrives, and if it matches, its action immediately becomes the final result. Among multiple `racing`
-rules, the first matching response wins and the remaining queries are canceled.
-
-While `racing` rules are pending, only `racing` rules can take effect: the action of any other
-matched rule waits until all pending `racing` rules have been decided. Actions that send a new query
-(`route`, `evaluate`, and the default server) also delay sending it while waiting, unless
-[`speculative`](/configuration/dns/rule_action/#speculative) is enabled.
-Rule matching itself continues without waiting.
-
-Requires `match_response`, and the action must be a final action (`route`, `respond`, `reject` or
-`predefined`). Not available on logical rules.
-
-Only put servers into a group of `racing` rules when any of their responses is acceptable;
-for a fixed preference order, use rules without `racing` instead — the queries are still sent in
-parallel, and responses are taken in rule order.
 
 #### ip_accept_any
 

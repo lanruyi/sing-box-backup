@@ -15,10 +15,7 @@ icon: material/alert-decagram
     :material-plus: [response_extra](#response_extra)  
     :material-plus: [package_name_regex](#package_name_regex)  
     :material-alert: [ip_version](#ip_version)  
-    :material-alert: [query_type](#query_type)  
-    :material-plus: [racing](#racing)  
-    :material-plus: [domain_label_count](#domain_label_count)  
-    :material-plus: [search_domain_available](#search_domain_available)
+    :material-alert: [query_type](#query_type)
 
 !!! quote "sing-box 1.13.0 中的更改"
 
@@ -102,7 +99,6 @@ icon: material/alert-decagram
         "domain_regex": [
           "^stun\\..+"
         ],
-        "domain_label_count": 1,
         "source_ip_cidr": [
           "10.0.0.0/24",
           "192.168.0.1"
@@ -175,9 +171,6 @@ icon: material/alert-decagram
           "local",
           "ts-dns"
         ],
-        "search_domain_available": [
-          "ts-dns"
-        ],
         "wifi_ssid": [
           "My WIFI"
         ],
@@ -190,7 +183,6 @@ icon: material/alert-decagram
         ],
         "rule_set_ip_cidr_match_source": false,
         "match_response": false,
-        "racing": false,
         "ip_cidr": [
           "10.0.0.0/24",
           "192.168.0.1"
@@ -319,14 +311,6 @@ DNS 查询类型。值可以为整数或者类型名称字符串。
 #### domain_regex
 
 匹配域名正则表达式。
-
-#### domain_label_count
-
-!!! question "自 sing-box 1.14.0 起"
-
-匹配查询名中的 label 数量。
-
-`printer` 有 1 个 label；`printer.corp.example.com` 有 4 个。
 
 #### geosite
 
@@ -518,27 +502,11 @@ Available values: `wifi`, `cellular`, `ethernet` and `other`.
 | 类型            | 匹配                                                          |
 |---------------|-------------------------------------------------------------|
 | `hosts`       | 匹配预定义条目和 hosts 文件中的条目                                       |
-| `local`       | 匹配 hosts 中的条目、邻居解析得到的主机名、mDNS 本地域名以及系统 search domain 后缀      |
-| `dhcp`        | 匹配通过 DHCP 获取的 search domain 后缀                              |
+| `local`       | 匹配 hosts 中的条目、邻居解析得到的主机名以及 mDNS 本地域名                         |
 | `mdns`        | 匹配 mDNS 本地域名（`*.local.` 以及 IPv4/IPv6 链路本地反向区域）              |
-| `tailscale`   | 匹配 MagicDNS 主机、DNS 路由后缀以及 search domain 后缀                  |
-| `openvpn`     | 匹配 VPN 服务器推送的分流 DNS 和 search domain 后缀                         |
-| `openconnect` | 匹配 VPN 服务器推送的分流 DNS 和 search domain 后缀                         |
-| `resolved`    | 匹配 systemd-resolved 链路中的分流域名和 search domain 后缀                  |
-
-#### search_domain_available
-
-!!! question "自 sing-box 1.14.0 起"
-
-当指定的 DNS 服务器当前持有至少一个 search domain 时匹配。
-
-支持的 DNS 服务器类型：`local`、`dhcp`、`tailscale`、`openvpn`、`openconnect`、`resolved`。
-
-与 `preferred_by` 不同，此规则项不检查查询名。与 [`domain_label_count`](#domain_label_count)
-组合使用，可以仅在服务器实际持有 search domain 时，将非全限定名查询路由到能展开它们的服务器。
-
-对于 `tailscale`、`openvpn` 与 `openconnect` 服务器，展开单 label 查询还需要在服务器上启用
-`accept_search_domain`。
+| `tailscale`   | 匹配 MagicDNS 主机和 DNS 路由后缀                                    |
+| `openconnect` | 匹配 VPN 服务器推送的分流 DNS 和搜索域                                  |
+| `resolved`    | 匹配 systemd-resolved 链路中的分流域名和搜索域                            |
 
 #### wifi_ssid
 
@@ -585,33 +553,11 @@ Available values: `wifi`, `cellular`, `ethernet` and `other`.
 启用响应匹配。启用后，此规则将匹配已评估的响应（由前序 [`evaluate`](/zh/configuration/dns/rule_action/#evaluate) 动作设置），而不仅是匹配原始查询。
 
 可以为 `true` 或 `evaluate` 动作的 `tag`：`true` 匹配最近一条无 `tag` 的 `evaluate` 动作的响应；标签则匹配对应 `evaluate` 动作的响应。
-若所引用的查询失败，或其 `evaluate` 规则未执行，则响应条件不匹配（因此启用 `invert` 的规则会命中）。
-
-由于 `evaluate` 查询是异步发出的，带 `match_response` 的规则会等待所引用的查询完成后再进行匹配；
-启用 [`racing`](#racing) 可改为在响应到达时立即判定。
 
 该已评估的响应也可以被后续的 [`respond`](/zh/configuration/dns/rule_action/#respond) 动作直接返回；在带 `match_response` 标签的规则中，`respond` 返回该标签的响应。
 
 响应匹配字段（`response_rcode`、`response_answer`、`response_ns`、`response_extra`）需要此选项。
 当与 `evaluate` 或响应匹配字段一起使用时，`ip_cidr`、`ip_is_private` 和 `ip_accept_any` 也需要此选项。
-
-#### racing
-
-!!! question "自 sing-box 1.14.0 起"
-
-不等待 `match_response` 所引用的查询：该规则在其响应到达时求值，若命中，其动作立即成为最终结果。
-多条 `racing` 规则中，最先命中的响应生效，其余进行中的查询会被取消。
-
-存在尚未得出结果的 `racing` 规则时，仅 `racing` 规则可以立即生效：其他规则命中后，
-其动作会等待这些 `racing` 规则全部得出结果后才生效。会发起新查询的动作（`route`、`evaluate`
-与默认服务器）在等待期间也不会发出查询，除非启用了
-[`speculative`](/zh/configuration/dns/rule_action/#speculative)。规则匹配本身的处理不受等待影响。
-
-要求本规则含 `match_response`，且动作为最终动作（`route`、`respond`、`reject` 或 `predefined`）。
-不可用于逻辑规则。
-
-仅当任一服务器的结果都可接受时，才将它们放入同一组 `racing` 规则；
-若需要固定的优先顺序，请使用不带 `racing` 的规则——查询仍然并行发出，结果按规则顺序采用。
 
 #### ip_accept_any
 

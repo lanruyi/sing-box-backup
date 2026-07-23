@@ -98,7 +98,7 @@ func (r *RuleAction) UnmarshalJSON(data []byte) error {
 
 type _DNSRuleAction struct {
 	Action              string                       `json:"action,omitempty"`
-	Racing              bool                         `json:"racing,omitempty"`
+	Race                bool                         `json:"race,omitempty"`
 	RouteOptions        DNSRouteActionOptions        `json:"-"`
 	RouteOptionsOptions DNSRouteOptionsActionOptions `json:"-"`
 	RejectOptions       RejectActionOptions          `json:"-"`

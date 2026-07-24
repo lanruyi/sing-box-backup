@@ -76,11 +76,10 @@ func NewNetworkManager(ctx context.Context, logger logger.ContextLogger, options
 		interfaceFinder:     control.NewDefaultInterfaceFinder(),
 		autoDetectInterface: options.AutoDetectInterface,
 		defaultOptions: adapter.NetworkOptions{
-			BindInterface:   options.DefaultInterface,
-			RoutingMark:     uint32(options.DefaultMark),
-			DomainResolvers: defaultDomainResolver.Server,
+			BindInterface:  options.DefaultInterface,
+			RoutingMark:    uint32(options.DefaultMark),
+			DomainResolver: defaultDomainResolver.Server,
 			DomainResolveOptions: adapter.DNSQueryOptions{
-				ServerStrategy:         defaultDomainResolver.ServerStrategy,
 				Strategy:               C.DomainStrategy(defaultDomainResolver.Strategy),
 				Timeout:                time.Duration(defaultDomainResolver.Timeout),
 				DisableCache:           defaultDomainResolver.DisableCache,

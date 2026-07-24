@@ -10,9 +10,7 @@ icon: material/new-box
     :material-plus: [disable_optimistic_cache](#disable_optimistic_cache)  
     :material-plus: [timeout](#timeout)  
     :material-plus: [race](#race)  
-    :material-plus: [speculative](#speculative)  
-    :material-alert: [server](#server)  
-    :material-plus: [server_strategy](#server_strategy)
+    :material-plus: [speculative](#speculative)
 
 !!! quote "Changes in sing-box 1.12.0"
 
@@ -63,8 +61,7 @@ matched. The result may therefore depend on server speed only among race rules.
 ```json
 {
   "action": "route",  // default
-  "server": "", // or []
-  "server_strategy": "",
+  "server": "",
   "speculative": false,
   "strategy": "",
   "disable_cache": false,
@@ -81,26 +78,11 @@ matched. The result may therefore depend on server speed only among race rules.
 
 ==Required==
 
-Tag of target server or list of target server tags.
-
-#### server_strategy
-
-!!! question "Since sing-box 1.14.0"
-
-DNS server selection strategy when multiple servers are configured.
-
-Available values:
-
-- `fallback`: Use servers in order and fall back to later servers when needed.
-- `hybrid`: Query servers concurrently and use the first available result.
-
-`fallback` is used by default.
+Tag of target server.
 
 #### speculative
 
 !!! question "Since sing-box 1.14.0"
-
-Only available when `server` contains a single server.
 
 Conflict with `race`. Has no effect without a preceding `race` rule.
 
@@ -190,9 +172,8 @@ Tag of target server.
 
 Tag of the evaluated response.
 
-The server tag is used if empty.
-
-Subsequent rules can reference the response through [`match_response`](/configuration/dns/rule/#match_response).
+A tagged response is only referenced via [`match_response`](/configuration/dns/rule/#match_response) with the tag;
+`match_response: true` references the response of the latest `evaluate` action without `tag`.
 
 #### speculative
 
@@ -242,19 +223,15 @@ Will override `dns.client_subnet`.
 
 ```json
 {
-  "match_response": "",
   "action": "respond"
 }
 ```
 
-`respond` terminates rule evaluation and returns the evaluated response selected by
-[`match_response`](/configuration/dns/rule/#match_response).
+`respond` terminates rule evaluation and returns the evaluated response from a preceding [`evaluate`](/configuration/dns/rule_action/#evaluate) action.
 
 This action does not send a new DNS query.
 
-Only available on non-logical rules and requires a preceding top-level [`evaluate`](#evaluate) rule.
-
-If the selected response is unavailable, the request fails with an error instead of falling through to later rules.
+Only allowed after a preceding top-level `evaluate` rule. If the action is reached without an evaluated response at runtime, the request fails with an error instead of falling through to later rules.
 
 ### route-options
 

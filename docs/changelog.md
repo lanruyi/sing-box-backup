@@ -5,6 +5,7 @@ icon: material/alert-decagram
 #### 1.14.0-beta.5
 
 * Remove client metadata from AnyTLS requests by default **1**
+* Update naiveproxy to v150.0.7871.63-1
 * Fixes and improvements
 
 **1**:
@@ -18,6 +19,7 @@ and allow you to customize it, see
 #### 1.13.16
 
 * Remove client metadata from AnyTLS requests by default **1**
+* Fixes and improvements
 
 **1**:
 

@@ -103,6 +103,7 @@ type Endpoint struct {
 	routerCfg     *router.Config
 	dnsCfg        *tsDNS.Config
 	routeDomains  common.TypedValue[map[string]bool]
+	searchDomains atomic.Bool
 	routePrefixes atomic.Pointer[netipx.IPSet]
 
 	acceptRoutes               bool
@@ -497,6 +498,9 @@ func (t *Endpoint) watchState() {
 			var builder netipx.IPSetBuilder
 			for _, peer := range roNotify.NetMap.Peers {
 				for _, allowedIP := range peer.AllowedIPs().All() {
+					if allowedIP.Bits() == 0 {
+						continue
+					}
 					builder.AddPrefix(allowedIP)
 				}
 			}
@@ -898,7 +902,11 @@ func (t *Endpoint) PreferredDomain(metadata *adapter.InboundContext, domain stri
 	if routeDomains == nil {
 		return false
 	}
-	return routeDomains[strings.ToLower(domain)]
+	domain = strings.ToLower(domain)
+	if routeDomains[domain] {
+		return true
+	}
+	return !strings.Contains(domain, ".") && t.searchDomains.Load()
 }
 
 func (t *Endpoint) PreferredAddress(metadata *adapter.InboundContext, address netip.Addr) bool {
@@ -934,6 +942,7 @@ func (t *Endpoint) onReconfig(cfg *wgcfg.Config, routerCfg *router.Config, dnsCf
 		routeDomains[fqdn.WithoutTrailingDot()] = true
 	}
 	t.routeDomains.Store(routeDomains)
+	t.searchDomains.Store(len(dnsCfg.SearchDomains) > 0)
 
 	if t.onReconfigHook != nil {
 		t.onReconfigHook(cfg, routerCfg, dnsCfg)

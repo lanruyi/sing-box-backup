@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"flag"
@@ -106,19 +107,23 @@ func build() error {
 }
 
 func stageWinDivertDriver(architecture string, outputDirectory string) error {
-	for _, name := range []string{windivert.Asset64Name, windivert.Asset32Name} {
-		err := os.Remove(filepath.Join(outputDirectory, name))
-		if err != nil && !os.IsNotExist(err) {
-			return E.Cause(err, "remove stale ", name)
-		}
-	}
 	var assetName, assetDigest string
 	switch architecture {
 	case "amd64":
 		assetName, assetDigest = windivert.Asset64Name, windivert.Asset64SHA256
 	case "386":
 		assetName, assetDigest = windivert.Asset32Name, windivert.Asset32SHA256
-	default:
+	}
+	for _, name := range []string{windivert.Asset64Name, windivert.Asset32Name} {
+		if name == assetName {
+			continue
+		}
+		err := os.Remove(filepath.Join(outputDirectory, name))
+		if err != nil && !os.IsNotExist(err) {
+			return E.Cause(err, "remove stale ", name)
+		}
+	}
+	if assetName == "" {
 		return nil
 	}
 	assetDirectory := filepath.Join("common", "windivert", "assets")
@@ -130,7 +135,12 @@ func stageWinDivertDriver(architecture string, outputDirectory string) error {
 	if hex.EncodeToString(checksum[:]) != assetDigest {
 		return E.New(assetName, " does not match the digest declared in common/windivert")
 	}
-	err = os.WriteFile(filepath.Join(outputDirectory, assetName), content, 0o644)
+	targetPath := filepath.Join(outputDirectory, assetName)
+	staged, err := os.ReadFile(targetPath)
+	if err == nil && bytes.Equal(staged, content) {
+		return nil
+	}
+	err = os.WriteFile(targetPath, content, 0o644)
 	if err != nil {
 		return E.Cause(err, "write ", assetName)
 	}

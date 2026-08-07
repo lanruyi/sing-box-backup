@@ -5,43 +5,25 @@ package windivert
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	E "github.com/sagernet/sing/common/exceptions"
 )
 
-func driverFilePath() (string, error) {
-	if driverAssetName == "" {
-		return "", E.New("windivert: unsupported architecture ", runtime.GOARCH)
-	}
+func driverAsset() ([]byte, error) {
 	executablePath, err := os.Executable()
 	if err != nil {
-		return "", E.Cause(err, "windivert: locate executable")
+		return nil, E.Cause(err, "windivert: locate executable")
 	}
-	return filepath.Join(filepath.Dir(executablePath), driverAssetName), nil
-}
-
-func openVerifiedDriver() (string, *os.File, error) {
-	target, err := driverFilePath()
+	assetPath := filepath.Join(filepath.Dir(executablePath), driverAssetName)
+	content, err := os.ReadFile(assetPath)
 	if err != nil {
-		return "", nil, err
+		return nil, E.Cause(err, "windivert: read ", assetPath)
 	}
-	sysFile, err := openDriverFile(target)
-	if err != nil {
-		return "", nil, E.Cause(err, "windivert: open ", target)
+	digest := sha256.Sum256(content)
+	if hex.EncodeToString(digest[:]) != driverAssetDigest {
+		return nil, E.New("windivert: ", assetPath, " does not match the WinDivert ", AssetVersion, " digest")
 	}
-	digest := sha256.New()
-	_, err = io.Copy(digest, sysFile)
-	if err != nil {
-		sysFile.Close()
-		return "", nil, E.Cause(err, "windivert: read ", target)
-	}
-	if hex.EncodeToString(digest.Sum(nil)) != driverAssetDigest {
-		sysFile.Close()
-		return "", nil, E.New("windivert: driver file ", target, " does not match the WinDivert ", AssetVersion, " asset")
-	}
-	return target, sysFile, nil
+	return content, nil
 }

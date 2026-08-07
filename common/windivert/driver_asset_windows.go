@@ -1,4 +1,4 @@
-//go:build windows && !with_external_windivert
+//go:build windows
 
 package windivert
 
@@ -29,18 +29,26 @@ func openVerifiedDriver() (string, *os.File, error) {
 	if err != nil {
 		return "", nil, err
 	}
+	assetContent, err := driverAsset()
+	if err != nil {
+		return "", nil, err
+	}
 	err = os.MkdirAll(filepath.Dir(target), 0o755)
 	if err != nil {
 		return "", nil, E.Cause(err, "windivert: mkdir ", filepath.Dir(target))
 	}
 
+	var (
+		sysFile *os.File
+		content []byte
+	)
 	for attempt := 0; ; attempt++ {
-		sysFile, err := openDriverFile(target)
+		sysFile, err = openDriverFile(target)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return "", nil, E.Cause(err, "windivert: open ", target)
 			}
-			err = writeDriverFile(target)
+			err = writeDriverFile(target, assetContent)
 			if err != nil {
 				return "", nil, err
 			}
@@ -49,28 +57,28 @@ func openVerifiedDriver() (string, *os.File, error) {
 				return "", nil, E.Cause(err, "windivert: open ", target)
 			}
 		}
-		content, err := io.ReadAll(sysFile)
+		content, err = io.ReadAll(sysFile)
 		if err != nil {
 			sysFile.Close()
 			return "", nil, E.Cause(err, "windivert: read ", target)
 		}
-		if bytes.Equal(content, sysBytes) {
+		if bytes.Equal(content, assetContent) {
 			return target, sysFile, nil
 		}
 		sysFile.Close()
 		if attempt > 0 {
 			return "", nil, E.New("windivert: driver file ", target, " is being concurrently modified")
 		}
-		err = writeDriverFile(target)
+		err = writeDriverFile(target, assetContent)
 		if err != nil {
 			return "", nil, err
 		}
 	}
 }
 
-func writeDriverFile(target string) error {
+func writeDriverFile(target string, content []byte) error {
 	temporaryPath := target + ".tmp-" + strconv.Itoa(os.Getpid())
-	err := os.WriteFile(temporaryPath, sysBytes, 0o644)
+	err := os.WriteFile(temporaryPath, content, 0o644)
 	if err != nil {
 		return E.Cause(err, "windivert: write ", filepath.Base(target))
 	}

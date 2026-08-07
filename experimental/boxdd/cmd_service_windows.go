@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sagernet/sing-box/common/windivert"
 	"github.com/sagernet/sing-box/log"
 	E "github.com/sagernet/sing/common/exceptions"
 
@@ -266,10 +265,6 @@ func serviceUninstall() error {
 	err = service.Delete()
 	if err != nil {
 		return E.Cause(err, "delete service")
-	}
-	err = windivert.Uninstall()
-	if err != nil {
-		log.Warn("uninstall windivert driver: ", err)
 	}
 	err = eventlog.Remove(serviceName)
 	if err != nil {

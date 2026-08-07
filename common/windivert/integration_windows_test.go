@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && !with_external_windivert
 
 package windivert
 
@@ -74,6 +74,8 @@ func TestIntegrationRecvAbortsOnClose(t *testing.T) {
 	}
 }
 
+// The driver does not unload when the last handle closes: it stays running
+// until explicitly stopped, like `sc stop WinDivert`.
 func stopDriver(t *testing.T) {
 	t.Helper()
 	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
@@ -110,22 +112,6 @@ func stopDriver(t *testing.T) {
 			errors.Is(openErr, windows.ERROR_PATH_NOT_FOUND) ||
 			errors.Is(openErr, windows.ERROR_NO_SUCH_DEVICE)
 	}, 60*time.Second, 200*time.Millisecond, "driver device remained openable after stop")
-}
-
-// The sing-box-for-desktop installer overwrites the driver file on upgrade
-// and deletes it on uninstall, and reaches this path through the daemon's
-// service uninstall command.
-func TestIntegrationUninstallReleasesDriverFile(t *testing.T) {
-	h := openHandle(t, nil, FlagSendOnly)
-	require.NoError(t, h.Close())
-
-	require.NoError(t, Uninstall())
-
-	sysPath, err := driverFilePath()
-	require.NoError(t, err)
-	sysFile, err := os.OpenFile(sysPath, os.O_WRONLY, 0)
-	require.NoError(t, err)
-	require.NoError(t, sysFile.Close())
 }
 
 func TestIntegrationConcurrentOpen(t *testing.T) {

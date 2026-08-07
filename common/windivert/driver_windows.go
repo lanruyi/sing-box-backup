@@ -20,7 +20,6 @@ const (
 	driverInstallMutexName     = "WinDivertDriverInstallMutex"
 	driverInstallMutexTimeout  = 90 * time.Second
 	driverReadyTimeout         = 60 * time.Second
-	driverUnloadTimeout        = 60 * time.Second
 	driverStateRefreshInterval = 50 * time.Millisecond
 )
 
@@ -133,8 +132,7 @@ func tryInstallService(manager windows.Handle, serviceNameW, sysPathW *uint16) e
 	err = windows.StartService(service, 0, nil)
 	if err == nil {
 		// Upstream WinDivert.dll marks the service for deletion only in the
-		// process whose StartService succeeded; one that finds it already
-		// running leaves the deletion to that owner.
+		// process whose StartService succeeded.
 		_ = windows.DeleteService(service)
 		return nil
 	}
@@ -156,6 +154,18 @@ func tryInstallService(manager windows.Handle, serviceNameW, sysPathW *uint16) e
 func openOrCreateService(manager windows.Handle, serviceNameW, sysPathW *uint16) (windows.Handle, error) {
 	service, err := windows.OpenService(manager, serviceNameW, windows.SERVICE_ALL_ACCESS)
 	if err == nil {
+		err = windows.ChangeServiceConfig(
+			service,
+			windows.SERVICE_NO_CHANGE,
+			windows.SERVICE_NO_CHANGE,
+			windows.SERVICE_NO_CHANGE,
+			sysPathW,
+			nil, nil, nil, nil, nil, nil,
+		)
+		if err != nil {
+			windows.CloseServiceHandle(service)
+			return 0, E.Cause(err, "windivert: point service at ", driverAssetName)
+		}
 		return service, nil
 	}
 	service, err = windows.CreateService(
@@ -206,66 +216,4 @@ func openDriverFile(path string) (*os.File, error) {
 		return nil, err
 	}
 	return os.NewFile(uintptr(handle), path), nil
-}
-
-// The driver does not unload when the last handle closes, and the memory
-// manager keeps its backing image write-locked for a while after the service
-// reaches SERVICE_STOPPED.
-func Uninstall() error {
-	if driverAssetName == "" {
-		return nil
-	}
-	manager, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
-	if err != nil {
-		return E.Cause(err, "windivert: open SCM")
-	}
-	defer windows.CloseServiceHandle(manager)
-	serviceNameW, err := windows.UTF16PtrFromString(driverServiceName)
-	if err != nil {
-		return err
-	}
-	service, err := windows.OpenService(manager, serviceNameW, windows.SERVICE_STOP|windows.SERVICE_QUERY_STATUS|windows.DELETE)
-	if err != nil {
-		if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
-			return waitDriverFileUnloaded()
-		}
-		return E.Cause(err, "windivert: open service")
-	}
-	defer windows.CloseServiceHandle(service)
-	var status windows.SERVICE_STATUS
-	err = windows.ControlService(service, windows.SERVICE_CONTROL_STOP, &status)
-	if err != nil && !E.IsMulti(err, windows.ERROR_SERVICE_NOT_ACTIVE, windows.ERROR_SERVICE_CANNOT_ACCEPT_CTRL) {
-		return E.Cause(err, "windivert: stop service")
-	}
-	var deleteErr error
-	err = windows.DeleteService(service)
-	if err != nil && !errors.Is(err, windows.ERROR_SERVICE_MARKED_FOR_DELETE) {
-		deleteErr = E.Cause(err, "windivert: delete service")
-	}
-	return E.Errors(deleteErr, waitDriverFileUnloaded())
-}
-
-func waitDriverFileUnloaded() error {
-	target, err := driverFilePath()
-	if err != nil {
-		return err
-	}
-	deadline := time.Now().Add(driverUnloadTimeout)
-	for {
-		file, openErr := os.OpenFile(target, os.O_WRONLY, 0)
-		if openErr == nil {
-			file.Close()
-			return nil
-		}
-		if os.IsNotExist(openErr) {
-			return nil
-		}
-		if !E.IsMulti(openErr, windows.ERROR_SHARING_VIOLATION, windows.ERROR_USER_MAPPED_FILE) {
-			return E.Cause(openErr, "windivert: open ", target)
-		}
-		if time.Now().After(deadline) {
-			return E.Cause(openErr, "windivert: wait for driver image unload")
-		}
-		time.Sleep(driverStateRefreshInterval)
-	}
 }

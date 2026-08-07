@@ -32,13 +32,9 @@ const (
 	PriorityLowest  int16 = -30000
 )
 
-// Address mirrors WINDIVERT_ADDRESS from windivert.h (80 bytes,
-// little-endian on both amd64 and 386):
-//
-//	 0: INT64  Timestamp
-//	 8: UINT32 bitfield: Layer:8 | Event:8 | flags | Reserved1:8
-//	12: UINT32 Reserved2
-//	16: 64 bytes union (WINDIVERT_DATA_NETWORK / FLOW / SOCKET / REFLECT)
+// WINDIVERT_ADDRESS from windivert.h: bits packs Layer:8 | Event:8 | flags |
+// Reserved1:8, and the trailing 64 bytes are a union of
+// WINDIVERT_DATA_NETWORK / FLOW / SOCKET / REFLECT.
 type Address struct {
 	Timestamp int64
 	bits      uint32

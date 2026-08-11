@@ -15,7 +15,6 @@ import (
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/logger"
-	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 
 	mDNS "github.com/miekg/dns"
@@ -131,7 +130,7 @@ func (t *Transport) Environment() []string {
 	if t.resolved != nil {
 		return t.resolved.Environment()
 	}
-	return common.Map(t.configSource.Configuration().Servers, M.Socksaddr.String)
+	return t.configSource.Configuration().Signature()
 }
 
 func (t *Transport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {

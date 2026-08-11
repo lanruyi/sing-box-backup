@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -41,6 +42,15 @@ func (c *Config) Equal(other *Config) bool {
 		c.SingleRequest == other.SingleRequest &&
 		c.UseTCP == other.UseTCP &&
 		c.TrustAD == other.TrustAD
+}
+
+func (c *Config) Signature() []string {
+	signature := make([]string, 0, len(c.Servers)+len(c.Search)+1)
+	for _, server := range c.Servers {
+		signature = append(signature, server.String())
+	}
+	signature = append(signature, c.Search...)
+	return append(signature, "ndots:"+strconv.Itoa(c.Ndots))
 }
 
 func (c *Config) ServerOffset() uint32 {

@@ -112,9 +112,20 @@ func (c *Client) newCacheKey(transport adapter.DNSTransport, question dns.Questi
 	return cacheKey
 }
 
-func (c *Client) environmentChanged(transport adapter.DNSTransport, key dnsCacheKey) bool {
+func (c *Client) finishCacheKey(transport adapter.DNSTransport, key dnsCacheKey) (dnsCacheKey, bool) {
 	environmentTransport, withEnvironment := transport.(adapter.DNSTransportWithEnvironment)
-	return withEnvironment && environmentHash(environmentTransport.Environment()) != key.environment
+	if !withEnvironment {
+		return key, true
+	}
+	environment := environmentHash(environmentTransport.Environment())
+	if environment == key.environment {
+		return key, true
+	}
+	if key.environment == 0 {
+		key.environment = environment
+		return key, true
+	}
+	return key, false
 }
 
 func environmentHash(environment []string) uint64 {
@@ -276,6 +287,8 @@ func (c *Client) beginExchange(ctx context.Context, transport adapter.DNSTranspo
 			case <-ctx.Done():
 				return nil, nil, exchangeDone, ctx.Err()
 			}
+			cacheKey = c.newCacheKey(transport, question, message, options)
+			operation.cacheKey = cacheKey
 		} else {
 			operation.releaseCond = func() {
 				c.cacheLock.Delete(cacheKey)
@@ -335,8 +348,11 @@ func (c *Client) finishExchange(transport adapter.DNSTransport, operation *excha
 		}
 	}
 	timeToLive := applyResponseOptions(question, response, operation.options)
-	if !disableCache && !c.environmentChanged(transport, operation.cacheKey) {
-		c.storeCache(operation.cacheKey, response, timeToLive)
+	if !disableCache {
+		cacheKey, storable := c.finishCacheKey(transport, operation.cacheKey)
+		if storable {
+			c.storeCache(cacheKey, response, timeToLive)
+		}
 	}
 	response.Id = operation.messageId
 	requestEDNSOpt := operation.message.IsEdns0()
@@ -646,11 +662,12 @@ func (c *Client) backgroundRefreshDNS(transport adapter.DNSTransport, key dnsCac
 		} else if response.Rcode != dns.RcodeSuccess && response.Rcode != dns.RcodeNameError {
 			return
 		}
-		if c.environmentChanged(transport, key) {
+		storeKey, storable := c.finishCacheKey(transport, key)
+		if !storable {
 			return
 		}
 		timeToLive := applyResponseOptions(key.Question, response, options)
-		c.storeCache(key, response, timeToLive)
+		c.storeCache(storeKey, response, timeToLive)
 		logRefreshedResponse(c.logger, ctx, response, timeToLive)
 	}()
 }

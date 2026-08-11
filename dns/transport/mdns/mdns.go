@@ -20,7 +20,6 @@ import (
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/json/badoption"
 	"github.com/sagernet/sing/common/logger"
-	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/common/task"
 	"github.com/sagernet/sing/service"
 
@@ -119,7 +118,7 @@ func (t *Transport) Environment() []string {
 	if t.configSource == nil {
 		return nil
 	}
-	return common.Map(t.configSource.Configuration().Servers, M.Socksaddr.String)
+	return t.configSource.Configuration().Signature()
 }
 
 func (t *Transport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {

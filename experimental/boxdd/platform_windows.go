@@ -152,15 +152,15 @@ func (p *windowsPlatformInterface) UsePlatformWIFIMonitor() bool {
 }
 
 func (p *windowsPlatformInterface) UsePlatformNotification() bool {
-	return false
+	return true
 }
 
 func (p *windowsPlatformInterface) SendNotification(notification *adapter.Notification) error {
-	return nil
+	return p.daemon.startedService.SendNotification(notification)
 }
 
 func (p *windowsPlatformInterface) CancelNotification(identifier string, typeID int32) error {
-	return nil
+	return p.daemon.startedService.CancelNotification(identifier, typeID)
 }
 
 func (p *windowsPlatformInterface) MyInterfaceAddress() []netip.Addr {

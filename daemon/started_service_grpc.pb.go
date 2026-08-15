@@ -55,6 +55,7 @@ const (
 	StartedService_SubscribeOpenVPNStatus_FullMethodName         = "/daemon.StartedService/SubscribeOpenVPNStatus"
 	StartedService_SubmitOpenVPNChallengeResponse_FullMethodName = "/daemon.StartedService/SubmitOpenVPNChallengeResponse"
 	StartedService_CancelOpenVPNChallenge_FullMethodName         = "/daemon.StartedService/CancelOpenVPNChallenge"
+	StartedService_SubscribeNotifications_FullMethodName         = "/daemon.StartedService/SubscribeNotifications"
 )
 
 // StartedServiceClient is the client API for StartedService service.
@@ -101,6 +102,7 @@ type StartedServiceClient interface {
 	SubscribeOpenVPNStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[OpenVPNStatusUpdate], error)
 	SubmitOpenVPNChallengeResponse(ctx context.Context, in *OpenVPNChallengeSubmission, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CancelOpenVPNChallenge(ctx context.Context, in *OpenVPNChallengeCancel, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SubscribeNotifications(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[NotificationEvent], error)
 }
 
 type startedServiceClient struct {
@@ -664,6 +666,25 @@ func (c *startedServiceClient) CancelOpenVPNChallenge(ctx context.Context, in *O
 	return out, nil
 }
 
+func (c *startedServiceClient) SubscribeNotifications(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[NotificationEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &StartedService_ServiceDesc.Streams[19], StartedService_SubscribeNotifications_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, NotificationEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type StartedService_SubscribeNotificationsClient = grpc.ServerStreamingClient[NotificationEvent]
+
 // StartedServiceServer is the server API for StartedService service.
 // All implementations must embed UnimplementedStartedServiceServer
 // for forward compatibility.
@@ -708,6 +729,7 @@ type StartedServiceServer interface {
 	SubscribeOpenVPNStatus(*emptypb.Empty, grpc.ServerStreamingServer[OpenVPNStatusUpdate]) error
 	SubmitOpenVPNChallengeResponse(context.Context, *OpenVPNChallengeSubmission) (*emptypb.Empty, error)
 	CancelOpenVPNChallenge(context.Context, *OpenVPNChallengeCancel) (*emptypb.Empty, error)
+	SubscribeNotifications(*emptypb.Empty, grpc.ServerStreamingServer[NotificationEvent]) error
 	mustEmbedUnimplementedStartedServiceServer()
 }
 
@@ -876,6 +898,10 @@ func (UnimplementedStartedServiceServer) SubmitOpenVPNChallengeResponse(context.
 
 func (UnimplementedStartedServiceServer) CancelOpenVPNChallenge(context.Context, *OpenVPNChallengeCancel) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelOpenVPNChallenge not implemented")
+}
+
+func (UnimplementedStartedServiceServer) SubscribeNotifications(*emptypb.Empty, grpc.ServerStreamingServer[NotificationEvent]) error {
+	return status.Error(codes.Unimplemented, "method SubscribeNotifications not implemented")
 }
 func (UnimplementedStartedServiceServer) mustEmbedUnimplementedStartedServiceServer() {}
 func (UnimplementedStartedServiceServer) testEmbeddedByValue()                        {}
@@ -1473,6 +1499,17 @@ func _StartedService_CancelOpenVPNChallenge_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StartedService_SubscribeNotifications_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(StartedServiceServer).SubscribeNotifications(m, &grpc.GenericServerStream[emptypb.Empty, NotificationEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type StartedService_SubscribeNotificationsServer = grpc.ServerStreamingServer[NotificationEvent]
+
 // StartedService_ServiceDesc is the grpc.ServiceDesc for StartedService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1662,6 +1699,11 @@ var StartedService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "SubscribeOpenVPNStatus",
 			Handler:       _StartedService_SubscribeOpenVPNStatus_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SubscribeNotifications",
+			Handler:       _StartedService_SubscribeNotifications_Handler,
 			ServerStreams: true,
 		},
 	},

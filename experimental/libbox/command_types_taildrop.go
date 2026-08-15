@@ -123,16 +123,33 @@ func (s *TaildropSendSession) WriteChunk(data []byte) error {
 	if s.ctx.Err() != nil {
 		return os.ErrClosed
 	}
-	return s.stream.Send(&daemon.TaildropSendClientMessage{
+	err := s.stream.Send(&daemon.TaildropSendClientMessage{
 		Message: &daemon.TaildropSendClientMessage_Chunk{Chunk: &daemon.TaildropFileChunk{Data: data}},
 	})
+	if err != nil {
+		return s.finishSend()
+	}
+	return nil
 }
 
 func (s *TaildropSendSession) FinishFile() error {
 	if s.ctx.Err() != nil {
 		return os.ErrClosed
 	}
-	return s.stream.Send(&daemon.TaildropSendClientMessage{
+	err := s.stream.Send(&daemon.TaildropSendClientMessage{
 		Message: &daemon.TaildropSendClientMessage_FileDone{FileDone: &daemon.TaildropFileDone{}},
 	})
+	if err != nil {
+		return s.finishSend()
+	}
+	return nil
+}
+
+// grpc-go reports the RPC status only through RecvMsg; a Send on a stream
+// terminated by the server returns bare io.EOF. Wait for the receive
+// goroutine to deliver the status through OnFinish, then return a sentinel
+// the caller does not report.
+func (s *TaildropSendSession) finishSend() error {
+	<-s.closeDone
+	return os.ErrClosed
 }

@@ -16,6 +16,7 @@ func init() {
 		TailscaleRunning:        "Работает",
 		TaildropReceiving:       "Получение %[1]s от %[2]s",
 		TaildropReceived:        "%[1]s получен от %[2]s",
+		TaildropSendCanceled:    "Отправка %s отменена получателем",
 		VPNConnecting:           "Подключение",
 		VPNAuthentication:       "Требуется аутентификация",
 		VPNConnected:            "Подключено",

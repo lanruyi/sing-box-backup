@@ -50,6 +50,7 @@ service StartedService {
   rpc SubscribeOpenVPNStatus(google.protobuf.Empty) returns (stream OpenVPNStatusUpdate) {}
   rpc SubmitOpenVPNChallengeResponse(OpenVPNChallengeSubmission) returns (google.protobuf.Empty) {}
   rpc CancelOpenVPNChallenge(OpenVPNChallengeCancel) returns (google.protobuf.Empty) {}
+  rpc SubscribeNotifications(google.protobuf.Empty) returns (stream NotificationEvent) {}
 }
 
 message Version {
@@ -769,4 +770,26 @@ message OpenVPNChallengeSubmission {
 message OpenVPNChallengeCancel {
   string endpointTag = 1;
   string challengeID = 2;
+}
+
+message NotificationEvent {
+  oneof event {
+    Notification send = 1;
+    NotificationCancel cancel = 2;
+  }
+}
+
+message Notification {
+  string identifier = 1;
+  string typeName = 2;
+  int32 typeID = 3;
+  string title = 4;
+  string subtitle = 5;
+  string body = 6;
+  string openURL = 7;
+}
+
+message NotificationCancel {
+  string identifier = 1;
+  int32 typeID = 2;
 }

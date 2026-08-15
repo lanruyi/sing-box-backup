@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sagernet/sing-box/experimental/locale"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -99,7 +101,7 @@ func (t *Endpoint) SendTaildropFile(ctx context.Context, peerStableID string, fi
 		messageBytes, _ := io.ReadAll(io.LimitReader(response.Body, 1024))
 		message := strings.TrimSpace(string(messageBytes))
 		if message == errTaildropCanceled.Error() {
-			return E.New("taildrop: send ", fileName, ": canceled by receiver")
+			return E.New(fmt.Sprintf(locale.Current().TaildropSendCanceled, fileName))
 		}
 		return E.New("taildrop: send ", fileName, ": peer responded ", response.Status, ": ", message)
 	}

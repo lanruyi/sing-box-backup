@@ -16,6 +16,7 @@ func init() {
 		TailscaleRunning:        "در حال اجرا",
 		TaildropReceiving:       "در حال دریافت %[1]s از %[2]s",
 		TaildropReceived:        "%[1]s از %[2]s دریافت شد",
+		TaildropSendCanceled:    "ارسال %s توسط گیرنده لغو شد",
 		VPNConnecting:           "در حال اتصال",
 		VPNAuthentication:       "نیاز به احراز هویت",
 		VPNConnected:            "متصل",

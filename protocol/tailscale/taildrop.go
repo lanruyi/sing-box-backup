@@ -42,6 +42,7 @@ const (
 	taildropBlockSize          = 64 << 10
 	taildropDeleteDelay        = time.Hour
 	taildropDeleteRetryDelay   = 5 * time.Second
+	taildropRejectDrainTimeout = 3 * time.Second
 	taildropNotificationTypeID = 11
 )
 
@@ -406,7 +407,7 @@ func (m *taildropManager) putFile(senderID string, senderName string, baseName s
 	m.access.Unlock()
 	m.notifyFilesChanged()
 	receivingName := "receiving/" + senderID + "/" + baseName
-	m.sendNotification(receivingName, fmt.Sprintf(locale.Current().TaildropReceiving, baseName, senderName))
+	m.sendNotification(receivingName, fmt.Sprintf(locale.FromContext(m.ctx).TaildropReceiving, baseName, senderName))
 	defer m.cancelNotification(receivingName)
 	defer func() {
 		m.access.Lock()
@@ -489,7 +490,7 @@ func (m *taildropManager) putFile(senderID string, senderName string, baseName s
 	m.totalReceived.Add(1)
 	m.logger.Info("taildrop: received ", finalName, " (", offset+copied, " bytes) from ", senderName)
 	m.notifyFilesChanged()
-	m.sendNotification(finalName, fmt.Sprintf(locale.Current().TaildropReceived, finalName, senderName))
+	m.sendNotification(finalName, fmt.Sprintf(locale.FromContext(m.ctx).TaildropReceived, finalName, senderName))
 	return nil
 }
 
@@ -878,20 +879,49 @@ func (m *taildropManager) handlePeerRequest(handler ipnlocal.PeerAPIHandler, w h
 		err = m.putFile(senderID, handler.Peer().ComputedName(), baseName, r.Body, offset, r.ContentLength, func() {
 			_ = responseController.SetReadDeadline(time.Now())
 		})
-		switch {
-		case err == nil:
+		if err == nil {
 			io.WriteString(w, "{}\n")
+			return
+		}
+		var (
+			statusCode int
+			message    string
+		)
+		switch {
 		case errors.Is(err, errTaildropInvalidFileName):
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			statusCode = http.StatusBadRequest
+			message = err.Error()
 		case errors.Is(err, errTaildropFileExists):
-			http.Error(w, err.Error(), http.StatusConflict)
+			statusCode = http.StatusConflict
+			message = err.Error()
 		case errors.Is(err, errTaildropCanceled):
 			m.logger.Debug("taildrop: receive ", baseName, ": ", err)
-			http.Error(w, err.Error(), http.StatusForbidden)
+			statusCode = http.StatusForbidden
+			message = err.Error()
 		default:
 			m.logger.Error("taildrop: receive ", baseName, ": ", err)
-			http.Error(w, "taildrop: receive failed", http.StatusInternalServerError)
+			statusCode = http.StatusInternalServerError
+			message = "taildrop: receive failed"
 		}
+		// http.Error deletes Content-Length, so a response flushed before the
+		// handler returns is sent chunked and the sender cannot finish reading
+		// it until the handler returns; net/http then tears the connection down
+		// while the request body is unread, which aborts it with a reset and
+		// discards the response along with any pending retransmission of it.
+		// Write a complete response instead, then hold the connection open
+		// until the sender reads the response and closes it.
+		responseBody := message + "\n"
+		responseHeader := w.Header()
+		responseHeader.Set("Content-Type", "text/plain; charset=utf-8")
+		responseHeader.Set("Content-Length", strconv.Itoa(len(responseBody)))
+		if r.ProtoMajor == 1 {
+			responseHeader.Set("Connection", "close")
+		}
+		w.WriteHeader(statusCode)
+		io.WriteString(w, responseBody)
+		_ = responseController.Flush()
+		_ = responseController.SetReadDeadline(time.Now().Add(taildropRejectDrainTimeout))
+		_, _ = io.Copy(io.Discard, r.Body)
 	default:
 		http.Error(w, "expected method GET or PUT", http.StatusMethodNotAllowed)
 	}

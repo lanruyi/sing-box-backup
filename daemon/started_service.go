@@ -36,7 +36,10 @@ import (
 
 const APIVersion = 4
 
-const urlTestPushMinInterval = 250 * time.Millisecond
+const (
+	urlTestPushMinInterval = 250 * time.Millisecond
+	notificationQueueSize  = 16
+)
 
 var _ StartedServiceServer = (*StartedService)(nil)
 
@@ -68,6 +71,8 @@ type StartedService struct {
 	urlTestObserver         *observable.Observer[struct{}]
 	clashModeSubscriber     *observable.Subscriber[struct{}]
 	clashModeObserver       *observable.Observer[struct{}]
+	notificationSubscriber  *observable.Subscriber[*NotificationEvent]
+	notificationObserver    *observable.Observer[*NotificationEvent]
 }
 
 type ServiceOptions struct {
@@ -106,11 +111,13 @@ func NewStartedService(options ServiceOptions) *StartedService {
 		logSubscriber:           observable.NewSubscriber[*log.Entry](128),
 		urlTestSubscriber:       observable.NewSubscriber[struct{}](1),
 		clashModeSubscriber:     observable.NewSubscriber[struct{}](1),
+		notificationSubscriber:  observable.NewSubscriber[*NotificationEvent](notificationQueueSize),
 	}
 	s.serviceStatusObserver = observable.NewObserver(s.serviceStatusSubscriber, 2)
 	s.logObserver = observable.NewObserver(s.logSubscriber, 64)
 	s.urlTestObserver = observable.NewObserver(s.urlTestSubscriber, 1)
 	s.clashModeObserver = observable.NewObserver(s.clashModeSubscriber, 1)
+	s.notificationObserver = observable.NewObserver(s.notificationSubscriber, notificationQueueSize)
 	return s
 }
 
@@ -283,6 +290,7 @@ func (s *StartedService) Close() {
 	s.logSubscriber.Close()
 	s.urlTestSubscriber.Close()
 	s.clashModeSubscriber.Close()
+	s.notificationSubscriber.Close()
 }
 
 func (s *StartedService) CloseService() error {
@@ -1997,6 +2005,58 @@ func (s *StartedService) CancelOpenVPNChallenge(ctx context.Context, request *Op
 		return nil, err
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (s *StartedService) SendNotification(notification *adapter.Notification) error {
+	s.notificationSubscriber.Emit(&NotificationEvent{
+		Event: &NotificationEvent_Send{
+			Send: &Notification{
+				Identifier: notification.Identifier,
+				TypeName:   notification.TypeName,
+				TypeID:     notification.TypeID,
+				Title:      notification.Title,
+				Subtitle:   notification.Subtitle,
+				Body:       notification.Body,
+				OpenURL:    notification.OpenURL,
+			},
+		},
+	})
+	return nil
+}
+
+func (s *StartedService) CancelNotification(identifier string, typeID int32) error {
+	s.notificationSubscriber.Emit(&NotificationEvent{
+		Event: &NotificationEvent_Cancel{
+			Cancel: &NotificationCancel{
+				Identifier: identifier,
+				TypeID:     typeID,
+			},
+		},
+	})
+	return nil
+}
+
+func (s *StartedService) SubscribeNotifications(empty *emptypb.Empty, server grpc.ServerStreamingServer[NotificationEvent]) error {
+	subscription, done, err := s.notificationObserver.Subscribe()
+	if err != nil {
+		return err
+	}
+	defer s.notificationObserver.UnSubscribe(subscription)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return s.ctx.Err()
+		case <-server.Context().Done():
+			return server.Context().Err()
+		case <-done:
+			return nil
+		case event := <-subscription:
+			err = server.Send(event)
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (s *StartedService) mustEmbedUnimplementedStartedServiceServer() {

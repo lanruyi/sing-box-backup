@@ -27,7 +27,7 @@ func readWriteBytes() uint64 {
 	if err != nil {
 		return 0
 	}
-	for _, line := range strings.Split(string(content), "\n") {
+	for line := range strings.SplitSeq(string(content), "\n") {
 		value, found := strings.CutPrefix(line, "write_bytes: ")
 		if !found {
 			continue

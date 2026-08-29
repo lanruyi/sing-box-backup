@@ -15,14 +15,10 @@ import (
 	"howett.net/plist"
 )
 
-var (
-	flagRunInCI    bool
-	flagTestFlight bool
-)
+var flagRunInCI bool
 
 func init() {
 	flag.BoolVar(&flagRunInCI, "ci", false, "Run in CI")
-	flag.BoolVar(&flagTestFlight, "testflight", false, "Override the marketing version with the version reserved for TestFlight")
 }
 
 func main() {
@@ -45,15 +41,9 @@ func main() {
 	common.Must(decoder.Decode(&project))
 	objectsMap := project["objects"].(map[string]any)
 	projectContent := string(common.Must1(os.ReadFile("sing-box.xcodeproj/project.pbxproj")))
-	marketingVersion := newVersion.VersionString()
-	if flagTestFlight {
-		marketingVersion = build_shared.TestFlightVersion(newVersion)
-	}
-	newContent, updated0 := findAndReplace(objectsMap, projectContent, []string{"io.nekohasekai.sfamt"}, marketingVersion)
-	newContent, updated1 := findAndReplace(objectsMap, newContent, []string{"io.nekohasekai.sfamt.standalone", "io.nekohasekai.sfamt.system"}, newVersion.String())
-	marketingVersionUpdated := updated0 || updated1
+	newContent, marketingVersionUpdated := findAndReplace(objectsMap, projectContent, []string{"io.nekohasekai.sfamt.standalone", "io.nekohasekai.sfamt.system"}, newVersion.String())
 	if marketingVersionUpdated {
-		log.Info("updated version to ", marketingVersion, " (", newVersion.String(), ")")
+		log.Info("updated version to ", newVersion.String())
 	}
 	var projectVersionUpdated bool
 	for environmentName, directory := range map[string]string{

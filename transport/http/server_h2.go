@@ -3,14 +3,17 @@ package http
 import (
 	std_bufio "bufio"
 	"context"
-	"io"
+	"crypto/tls"
 	"maps"
 	"net"
 	"net/http"
 	"strings"
 
+	"github.com/sagernet/sing-box/common/badhttp"
 	"github.com/sagernet/sing-box/log"
+	"github.com/sagernet/sing-box/transport/v2rayhttp"
 	"github.com/sagernet/sing/common/auth"
+	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -36,16 +39,35 @@ func (r *Reader) isHTTP2Preface() (bool, error) {
 	return string(preface) == http2Preface, nil
 }
 
+type connectionStater interface {
+	ConnectionState() tls.ConnectionState
+}
+
+type statedConn struct {
+	net.Conn
+	stater connectionStater
+}
+
+func (c *statedConn) ConnectionState() tls.ConnectionState {
+	return c.stater.ConnectionState()
+}
+
 func (s *Server) serveHTTP2(ctx context.Context, conn net.Conn, reader *Reader, handler Handler, source M.Socksaddr, onClose N.CloseHandlerFunc) {
-	s.http2Server.ServeConn(reader.cachedConn(conn), &http2.ServeConnOpts{
+	serveConn := reader.cachedConn(conn)
+	stater, isStater := conn.(connectionStater)
+	if isStater && serveConn != conn {
+		serveConn = &statedConn{Conn: serveConn, stater: stater}
+	}
+	s.http2Server.ServeConn(serveConn, &http2.ServeConnOpts{
 		Context: ctx,
 		BaseConfig: &http.Server{
 			MaxHeaderBytes: maxHeaderBytes,
 		},
 		Handler: &httpHandler{
-			server:  s,
-			handler: handler,
-			source:  source,
+			server:    s,
+			handler:   handler,
+			source:    source,
+			plaintext: !isStater,
 		},
 	})
 	if onClose != nil {
@@ -54,9 +76,10 @@ func (s *Server) serveHTTP2(ctx context.Context, conn net.Conn, reader *Reader, 
 }
 
 type httpHandler struct {
-	server  *Server
-	handler Handler
-	source  M.Socksaddr
+	server    *Server
+	handler   Handler
+	source    M.Socksaddr
+	plaintext bool
 }
 
 func (h *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -66,10 +89,10 @@ func (h *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		connectionSource = M.ParseSocksaddr(request.RemoteAddr).Unwrap()
 	}
 	if h.server.authenticator != nil {
-		username, password, ok := ParseBasicAuth(request.Header.Get("Proxy-Authorization"))
-		if !ok || !h.server.authenticator.Verify(username, password) {
+		username, password, valid := badhttp.ParseBasicAuth(request.Header.Get("Proxy-Authorization"))
+		if !valid || !h.server.authenticator.Verify(username, password) {
 			var authErr error
-			if !ok {
+			if !valid {
 				authErr = E.New("authentication failed: missing or malformed Proxy-Authorization")
 			} else {
 				authErr = E.New("authentication failed: username=", username)
@@ -81,7 +104,7 @@ func (h *httpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		}
 		ctx = auth.ContextWithUser(ctx, username)
 	}
-	source := forwardedSource(request, connectionSource)
+	source := badhttp.ForwardedSource(request, connectionSource)
 	if request.Method == http.MethodConnect {
 		protocol := request.Header.Get(":protocol")
 		if protocol == "" && request.ProtoMajor == 3 && !strings.HasPrefix(request.Proto, "HTTP/") {
@@ -110,15 +133,38 @@ func (h *httpHandler) serveConnect(ctx context.Context, writer http.ResponseWrit
 	}
 	writer.WriteHeader(http.StatusOK)
 	writer.(http.Flusher).Flush()
-	conn := newServerStreamConn(request, writer, source)
-	h.handler.NewConnectionEx(ctx, conn, source, destination, nil)
-	conn.wait(request.Context())
+	conn := v2rayhttp.NewHTTP2Wrapper(&v2rayhttp.ServerHTTPConn{
+		HTTP2Conn: v2rayhttp.NewHTTPConn(request.Body, writer),
+		Flusher:   writer.(http.Flusher),
+	})
+	done := make(chan struct{})
+	h.handler.NewConnectionEx(ctx, conn, source, destination, N.OnceClose(func(it error) {
+		close(done)
+	}))
+	<-done
+	conn.CloseWrapper()
 }
 
 func (h *httpHandler) serveForward(ctx context.Context, writer http.ResponseWriter, request *http.Request, source M.Socksaddr) {
-	destination := parseAuthority(request.Host, 80)
-	if request.Host == "" || !destination.IsValid() {
-		h.server.logger.ErrorContext(ctx, "process connection from ", source, ": invalid forward target: ", request.Host)
+	// golang.org/x/net/http2 builds the request URL from :path only (internal/httpcommon.NewServerRequest);
+	// :scheme survives only as request.TLS, which it sets when :scheme is https and the served conn
+	// exposes ConnectionState, so on a plaintext conn the scheme is unknowable. quic-go/http3 sets URL.Scheme.
+	if request.URL.Scheme == "" {
+		if h.plaintext {
+			h.server.logger.ErrorContext(ctx, "process connection from ", source, ": forward request over cleartext HTTP/2")
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if request.TLS != nil {
+			request.URL.Scheme = "https"
+		} else {
+			request.URL.Scheme = "http"
+		}
+	}
+	request.URL.Host = request.Host
+	destination, valid := forwardDestination(request)
+	if !valid {
+		h.server.logger.ErrorContext(ctx, "process connection from ", source, ": invalid forward target: ", request.URL.Scheme, "://", request.Host)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -132,7 +178,6 @@ func (h *httpHandler) serveForward(ctx context.Context, writer http.ResponseWrit
 	request.Close = false
 
 	upstream := newUpstreamConn(ctx, h.handler, source, destination)
-	defer upstream.Close()
 	stop := context.AfterFunc(request.Context(), func() {
 		upstream.Close()
 	})
@@ -146,6 +191,7 @@ func (h *httpHandler) serveForward(ctx context.Context, writer http.ResponseWrit
 		writeDone <- err
 	}()
 	defer func() {
+		upstream.Close()
 		request.Body.Close()
 		<-writeDone
 	}()
@@ -153,7 +199,7 @@ func (h *httpHandler) serveForward(ctx context.Context, writer http.ResponseWrit
 	var response *http.Response
 	for {
 		var err error
-		response, err = http.ReadResponse(upstream.reader, request)
+		response, err = upstream.readResponse(request)
 		if err != nil {
 			upstream.Close()
 			h.server.logger.ErrorContext(ctx, E.Cause(E.Errors(upstream.closeErr(), err), "process connection from ", source, ": read upstream response"))
@@ -166,36 +212,46 @@ func (h *httpHandler) serveForward(ctx context.Context, writer http.ResponseWrit
 		if response.StatusCode == http.StatusSwitchingProtocols {
 			upstream.Close()
 			h.server.logger.ErrorContext(ctx, "process connection from ", source, ": unexpected 101 response")
+			writer.WriteHeader(http.StatusBadGateway)
 			return
 		}
 		removeHopByHopHeaders(response.Header)
-		copyHeader(writer.Header(), response.Header)
+		maps.Copy(writer.Header(), response.Header)
 		writer.WriteHeader(response.StatusCode)
 		clear(writer.Header())
 	}
 	removeHopByHopHeaders(response.Header)
-	copyHeader(writer.Header(), response.Header)
-	if !responseHasBody(request, response) {
+	maps.Copy(writer.Header(), response.Header)
+	if !responseHasBody(request, response) && request.Method != http.MethodHead {
 		writer.Header().Del("Content-Length")
+	}
+	for name := range response.Trailer {
+		writer.Header().Add("Trailer", name)
 	}
 	writer.WriteHeader(response.StatusCode)
 	if !responseHasBody(request, response) {
 		response.Body.Close()
 		return
 	}
-	_, err := io.Copy(flushWriter{writer}, response.Body)
-	response.Body.Close()
+	writer.(http.Flusher).Flush()
+	_, err := bufio.Copy(flushWriter{writer}, response.Body)
 	if err != nil {
 		upstream.Close()
+		response.Body.Close()
 		h.server.logger.DebugContext(ctx, "process connection from ", source, ": relay response: ", err)
+		panic(http.ErrAbortHandler)
 	}
+	response.Body.Close()
+	maps.Copy(writer.Header(), response.Trailer)
 }
 
 func newUpstreamConn(ctx context.Context, handler Handler, source M.Socksaddr, destination M.Socksaddr) *upstreamConn {
 	serverSide, clientSide := pipe.Pipe()
+	limiter := &readLimiter{reader: clientSide, remaining: -1}
 	upstream := &upstreamConn{
 		Conn:        clientSide,
-		reader:      std_bufio.NewReader(clientSide),
+		reader:      std_bufio.NewReader(limiter),
+		limiter:     limiter,
 		source:      source,
 		destination: destination,
 		done:        make(chan struct{}),
@@ -205,10 +261,6 @@ func newUpstreamConn(ctx context.Context, handler Handler, source M.Socksaddr, d
 		close(upstream.done)
 	}))
 	return upstream
-}
-
-func copyHeader(destination http.Header, source http.Header) {
-	maps.Copy(destination, source)
 }
 
 type flushWriter struct {

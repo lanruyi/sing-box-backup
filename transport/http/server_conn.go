@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sagernet/sing-box/common/badhttp"
 	"github.com/sagernet/sing/common/auth"
 	E "github.com/sagernet/sing/common/exceptions"
 	F "github.com/sagernet/sing/common/format"
@@ -54,12 +55,12 @@ func (c *serverConn) serve() {
 func (c *serverConn) serveRequest() (requestResult, error) {
 	c.conn.SetReadDeadline(time.Now().Add(idleTimeout))
 	c.reader.setLimit(maxHeaderBytes)
-	request, err := ReadRequest(c.reader.Reader)
+	request, err := badhttp.ReadRequest(c.reader.Reader)
 	c.reader.setLimit(-1)
 	c.conn.SetReadDeadline(time.Time{})
 	if err != nil {
 		switch {
-		case errors.Is(err, io.EOF), isTimeout(err), E.IsClosed(err):
+		case errors.Is(err, io.EOF), E.IsTimeout(err), E.IsClosed(err):
 			return requestClose, err
 		case errors.Is(err, errHeaderTooLarge):
 			return c.rejectAndClose(nil, http.StatusRequestHeaderFieldsTooLarge, err)
@@ -69,20 +70,20 @@ func (c *serverConn) serveRequest() (requestResult, error) {
 	}
 	ctx := c.ctx
 	if c.server.authenticator != nil {
-		username, password, ok := ParseBasicAuth(request.Header.Get("Proxy-Authorization"))
-		if !ok || !c.server.authenticator.Verify(username, password) {
+		username, password, valid := badhttp.ParseBasicAuth(request.Header.Get("Proxy-Authorization"))
+		if !valid || !c.server.authenticator.Verify(username, password) {
 			var authErr error
-			if !ok {
+			if !valid {
 				authErr = E.New("authentication failed: missing or malformed Proxy-Authorization")
 			} else {
 				authErr = E.New("authentication failed: username=", username)
 			}
 			c.server.logger.ErrorContext(ctx, E.Cause(authErr, "process connection from ", c.source))
-			return c.reject(request, http.StatusProxyAuthRequired, authErr)
+			return c.reject(request, requestKeepAlive(request), http.StatusProxyAuthRequired, authErr)
 		}
 		ctx = auth.ContextWithUser(ctx, username)
 	}
-	source := forwardedSource(request, c.source)
+	source := badhttp.ForwardedSource(request, c.source)
 	switch {
 	case request.Method == http.MethodConnect:
 		return c.serveConnect(ctx, request, source)
@@ -98,7 +99,7 @@ func (c *serverConn) serveRequest() (requestResult, error) {
 func (c *serverConn) serveConnect(ctx context.Context, request *http.Request, source M.Socksaddr) (requestResult, error) {
 	destination := connectDestination(request)
 	if !destination.IsValid() {
-		return c.reject(request, http.StatusBadRequest, E.New("invalid CONNECT target: ", request.URL.Host))
+		return c.reject(request, requestKeepAlive(request), http.StatusBadRequest, E.New("invalid CONNECT target: ", request.URL.Host))
 	}
 	_, err := c.conn.Write([]byte(F.ToString("HTTP/", request.ProtoMajor, ".", request.ProtoMinor, " 200 Connection established\r\n\r\n")))
 	if err != nil {
@@ -108,8 +109,7 @@ func (c *serverConn) serveConnect(ctx context.Context, request *http.Request, so
 	return requestHandedOff, nil
 }
 
-func (c *serverConn) reject(request *http.Request, statusCode int, cause error) (requestResult, error) {
-	keepAlive := requestKeepAlive(request)
+func (c *serverConn) reject(request *http.Request, keepAlive bool, statusCode int, cause error) (requestResult, error) {
 	if keepAlive && request.Body != nil && request.Body != http.NoBody {
 		keepAlive = c.discardBody(request.Body)
 	}

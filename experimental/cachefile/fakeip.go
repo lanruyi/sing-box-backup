@@ -163,23 +163,29 @@ func (c *CacheFile) FakeIPLoadDomain(domain string, isIPv6 bool) (netip.Addr, bo
 		address, cached = c.writing.fakeIPAddress(domain, isIPv6)
 	}
 	c.pendingAccess.RUnlock()
-	if cached {
-		return address, true
-	}
-	_ = c.view(func(tx *bbolt.Tx) error {
-		var bucket *bbolt.Bucket
-		if isIPv6 {
-			bucket = tx.Bucket(bucketFakeIPDomain6)
-		} else {
-			bucket = tx.Bucket(bucketFakeIPDomain4)
-		}
-		if bucket == nil {
+	if !cached {
+		_ = c.view(func(tx *bbolt.Tx) error {
+			var bucket *bbolt.Bucket
+			if isIPv6 {
+				bucket = tx.Bucket(bucketFakeIPDomain6)
+			} else {
+				bucket = tx.Bucket(bucketFakeIPDomain4)
+			}
+			if bucket == nil {
+				return nil
+			}
+			address = M.AddrFromIP(bucket.Get([]byte(domain)))
 			return nil
-		}
-		address = M.AddrFromIP(bucket.Get([]byte(domain)))
-		return nil
-	})
-	return address, address.IsValid()
+		})
+	}
+	if !address.IsValid() {
+		return netip.Addr{}, false
+	}
+	currentDomain, loaded := c.FakeIPLoad(address)
+	if !loaded || currentDomain != domain {
+		return netip.Addr{}, false
+	}
+	return address, true
 }
 
 func (c *CacheFile) FakeIPReset() error {
@@ -199,14 +205,15 @@ func (c *CacheFile) FakeIPReset() error {
 	}
 	c.pendingAccess.Unlock()
 	return c.batch(func(tx *bbolt.Tx) error {
-		err := tx.DeleteBucket(bucketFakeIP)
-		if err != nil {
-			return err
+		for _, bucketName := range [][]byte{bucketFakeIP, bucketFakeIPDomain4, bucketFakeIPDomain6} {
+			if tx.Bucket(bucketName) == nil {
+				continue
+			}
+			err := tx.DeleteBucket(bucketName)
+			if err != nil {
+				return err
+			}
 		}
-		err = tx.DeleteBucket(bucketFakeIPDomain4)
-		if err != nil {
-			return err
-		}
-		return tx.DeleteBucket(bucketFakeIPDomain6)
+		return nil
 	})
 }

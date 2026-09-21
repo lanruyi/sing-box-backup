@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"net"
+	"slices"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/outbound"
@@ -37,21 +38,58 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	if err != nil {
 		return nil, err
 	}
+	headers := options.Headers.Build()
+	version := http.ResolveVersion(options.Version, options.Path, headers.Get("Host"))
 	tlsOptions := common.PtrValueOrDefault(options.TLS)
-	if tlsOptions.Enabled && len(tlsOptions.ALPN) == 0 {
-		tlsOptions.ALPN = []string{http2.NextProtoTLS, "http/1.1"}
+	if version == 3 && !tlsOptions.Enabled {
+		return nil, C.ErrTLSRequired
+	}
+	alpnIsDefault := tlsOptions.Enabled && len(tlsOptions.ALPN) == 0
+	if alpnIsDefault {
+		switch version {
+		case 1:
+			tlsOptions.ALPN = []string{"http/1.1"}
+		default:
+			tlsOptions.ALPN = []string{http2.NextProtoTLS, "http/1.1"}
+		}
 	}
 	detour, err := tls.NewDialerFromOptions(ctx, logger, outboundDialer, options.Server, tlsOptions)
 	if err != nil {
 		return nil, err
 	}
+	var http1Detour N.Dialer
+	if version >= 2 && (alpnIsDefault || slices.Contains(tlsOptions.ALPN, "http/1.1")) {
+		http1TLSOptions := tlsOptions
+		http1TLSOptions.ALPN = []string{"http/1.1"}
+		http1Detour, err = tls.NewDialerFromOptions(ctx, logger, outboundDialer, options.Server, http1TLSOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var quicTLSConfig tls.Config
+	if version == 3 {
+		if alpnIsDefault {
+			tlsOptions.ALPN = []string{"h3"}
+		}
+		quicTLSConfig, err = tls.NewClient(ctx, logger, options.Server, tlsOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
 	client, err := http.NewClient(http.ClientOptions{
-		Dialer:   detour,
-		Server:   options.ServerOptions.Build(),
-		Username: options.Username,
-		Password: options.Password,
-		Path:     options.Path,
-		Headers:  options.Headers.Build(),
+		Dialer:                 detour,
+		HTTP1Dialer:            http1Detour,
+		RawDialer:              outboundDialer,
+		TLSConfig:              quicTLSConfig,
+		Server:                 options.ServerOptions.Build(),
+		Username:               options.Username,
+		Password:               options.Password,
+		Path:                   options.Path,
+		Headers:                headers,
+		Version:                version,
+		DisableVersionFallback: options.DisableVersionFallback,
+		HTTP2Options:           options.HTTP2Options,
+		HTTP3Options:           options.HTTP3Options,
 	})
 	if err != nil {
 		return nil, err
@@ -61,6 +99,10 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		logger:  logger,
 		client:  client,
 	}, nil
+}
+
+func (h *Outbound) InterfaceUpdated(ctx context.Context) {
+	h.client.ResetConnections()
 }
 
 func (h *Outbound) Close() error {

@@ -7,12 +7,15 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/sagernet/quic-go"
 	"github.com/sagernet/quic-go/http3"
+	"github.com/sagernet/sing-box/common/httpclient"
 	"github.com/sagernet/sing-box/common/listener"
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/sagernet/sing-box/log"
+	"github.com/sagernet/sing-box/option"
 	boxHTTP "github.com/sagernet/sing-box/protocol/http"
 	transportHTTP "github.com/sagernet/sing-box/transport/http"
 	"github.com/sagernet/sing-quic"
@@ -22,7 +25,7 @@ import (
 )
 
 func init() {
-	boxHTTP.ConfigureHTTP3ListenerFunc = func(ctx context.Context, logger logger.Logger, listener *listener.Listener, handler http.Handler, tlsConfig tls.ServerConfig) (io.Closer, error) {
+	boxHTTP.ConfigureHTTP3ListenerFunc = func(ctx context.Context, logger logger.Logger, listener *listener.Listener, handler http.Handler, tlsConfig tls.ServerConfig, options option.QUICOptions) (io.Closer, error) {
 		err := qtls.ConfigureHTTP3(tlsConfig)
 		if err != nil {
 			return nil, err
@@ -31,12 +34,14 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		quicListener, err := qtls.ListenEarly(udpConn, tlsConfig, &quic.Config{
-			MaxIncomingStreams: 1 << 60,
-			Allow0RTT:          true,
-			DisablePathManager: true,
-			EnableDatagrams:    true,
-		})
+		quicConfig := httpclient.NewQUICConfig(options)
+		if quicConfig.MaxIncomingStreams == 0 {
+			quicConfig.MaxIncomingStreams = 1 << 60
+		}
+		quicConfig.Allow0RTT = true
+		quicConfig.DisablePathManager = true
+		quicConfig.EnableDatagrams = true
+		quicListener, err := qtls.ListenEarly(udpConn, tlsConfig, quicConfig)
 		if err != nil {
 			udpConn.Close()
 			return nil, err
@@ -58,21 +63,24 @@ func init() {
 		}()
 		return quicListener, nil
 	}
-	transportHTTP.HTTP3StreamFunc = func(writer http.ResponseWriter) (transportHTTP.DatagramStream, bool) {
+	transportHTTP.HTTP3StreamFunc = func(ctx context.Context, writer http.ResponseWriter) (transportHTTP.DatagramStream, bool) {
 		streamer, isStreamer := writer.(http3.HTTPStreamer)
 		if !isStreamer {
 			return nil, false
 		}
-		stream := &datagramStream{datagramsEnabled: true}
-		if settingser, isSettingser := writer.(http3.Settingser); isSettingser {
-			select {
-			case <-settingser.ReceivedSettings():
-				stream.datagramsEnabled = settingser.Settings().EnableDatagrams
-			default:
-			}
+		settingser, isSettingser := writer.(http3.Settingser)
+		if !isSettingser {
+			return nil, false
 		}
-		stream.Stream = streamer.HTTPStream()
-		return stream, true
+		select {
+		case <-settingser.ReceivedSettings():
+		case <-ctx.Done():
+			return nil, false
+		}
+		return &datagramStream{
+			Stream:           streamer.HTTPStream(),
+			datagramsEnabled: settingser.Settings().EnableDatagrams,
+		}, true
 	}
 }
 
@@ -97,6 +105,7 @@ func (s *datagramStream) SendDatagram(payload []byte) error {
 }
 
 func (s *datagramStream) Close() error {
+	s.Stream.SetWriteDeadline(time.Now())
 	s.Stream.CancelRead(0)
 	return s.Stream.Close()
 }

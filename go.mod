@@ -43,7 +43,7 @@ require (
 	github.com/sagernet/netlink v0.0.0-20260814022025-64455d367bbf
 	github.com/sagernet/nftables v0.3.0-mod.4
 	github.com/sagernet/quic-go v0.61.0-sing-box-mod.7
-	github.com/sagernet/sing v0.9.6-0.20260922013359-4ca3bebe0b8e
+	github.com/sagernet/sing v0.9.6-0.20260927091435-fcc22e2b9f96
 	github.com/sagernet/sing-anytls v0.0.0-20260924021732-7ca72921ac6a
 	github.com/sagernet/sing-cloudflared v0.1.3-0.20260706062323-d9787e794aa3
 	github.com/sagernet/sing-mux v0.3.9-0.20260919141002-baf887b90a62

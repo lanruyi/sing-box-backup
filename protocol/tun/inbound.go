@@ -280,7 +280,7 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 		inbound.tunOptions.AutoRedirectMarkMode = true
 		inbound.dnsHijackByPort = inbound.tunOptions.DNSModeOrDefault() == tun.DNSModeHijack
 		if !inbound.usePlatformAutoRedirect && options.NetNs == "" {
-			err = networkManager.RegisterAutoRedirectOutputMark(inbound.tunOptions.AutoRedirectOutputMark)
+			err = networkManager.RegisterAutoRedirectOutputMark(inbound.tunOptions.AutoRedirectOutputMarkOrDefault())
 			if err != nil {
 				return nil, err
 			}

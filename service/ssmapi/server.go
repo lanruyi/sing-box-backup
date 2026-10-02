@@ -92,16 +92,7 @@ func NewService(ctx context.Context, logger log.ContextLogger, tag string, optio
 }
 
 func (s *Service) Start(stage adapter.StartStage, scope *adapter.Scope) error {
-	if stage == adapter.StartStateInitialize {
-		for _, user := range s.users {
-			server := user.server
-			scope.Add(func() error {
-				server.SetTracker(nil)
-				return nil
-			})
-		}
-		return nil
-	} else if stage != adapter.StartStateStart {
+	if stage != adapter.StartStateStart {
 		return nil
 	}
 	err := s.loadCache()
